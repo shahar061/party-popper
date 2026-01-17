@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameConnection, type WebSocketMessage } from './hooks/useGameConnection';
 import { useGameStore } from './store/gameStore';
 import { LobbyScreen } from './components/LobbyScreen';
+import { GameplayScreen } from './components/GameplayScreen';
 import { ConnectionStatus } from './components/ConnectionStatus';
 import { ToastContainer, useToasts } from './components/Toast';
 import { TVLayout } from './components/TVLayout';
@@ -15,6 +16,7 @@ import type {
   ReassignTeamMessage,
   UpdateSettingsMessage,
   StartGameMessage,
+  NextRoundMessage,
   GameSettings,
 } from '@party-popper/shared';
 
@@ -59,6 +61,11 @@ function App() {
         case 'settings_updated': {
           const settingsMsg = serverMsg as SettingsUpdatedMessage;
           updateSettings(settingsMsg.payload.settings);
+          break;
+        }
+        case 'game_started': {
+          // Game has started, state will be synced via state_sync or we rely on status update
+          info('Game started!');
           break;
         }
         case 'error':
@@ -167,6 +174,14 @@ function App() {
     info('Starting game...');
   }, [send, info]);
 
+  // Handler for next round
+  const handleNextRound = useCallback(() => {
+    const message: NextRoundMessage = {
+      type: 'next_round',
+    };
+    send(message);
+  }, [send]);
+
   // Loading state
   if (screen === 'loading') {
     return (
@@ -202,6 +217,20 @@ function App() {
           onMovePlayer={handleMovePlayer}
           onUpdateSettings={handleUpdateSettings}
           onStartGame={handleStartGame}
+        />
+      </>
+    );
+  }
+
+  // Playing screen
+  if (screen === 'playing' && game) {
+    return (
+      <>
+        <ConnectionStatus state={connectionState} />
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        <GameplayScreen
+          game={game}
+          onNextRound={handleNextRound}
         />
       </>
     );
