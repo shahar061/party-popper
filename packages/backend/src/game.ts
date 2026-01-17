@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { GameState, GameStatus, GameMode, Team, Player, Song } from '@party-popper/shared';
+import type { GameState, GameStatus, GameMode, Team, Player, Song, Answer } from '@party-popper/shared';
 import { DEFAULT_SETTINGS, GAME_CONSTANTS } from '@party-popper/shared';
 import songsData from '../data/songs.json';
 
@@ -303,6 +303,112 @@ export class Game extends DurableObject {
     return teamACount <= teamBCount ? 'A' : 'B';
   }
 
+  // Round management methods
+  async startRound(): Promise<{ success: boolean; error?: string }> {
+    if (!this.state) {
+      return { success: false, error: 'Game not initialized' };
+    }
+
+    if (this.state.status !== 'playing') {
+      return { success: false, error: 'Game must be in playing state' };
+    }
+
+    // Pick next song
+    if (this.state.songPool.length === 0) {
+      return { success: false, error: 'No more songs available' };
+    }
+
+    const song = this.state.songPool.shift()!;
+    this.state.playedSongs.push(song);
+
+    // Determine active team (alternate based on round number)
+    const roundNumber = (this.state.playedSongs.length);
+    const activeTeam: 'A' | 'B' = (roundNumber % 2 === 1) ? 'A' : 'B';
+
+    // Create round
+    const now = Date.now();
+    const roundDuration = this.state.settings.roundTimeSeconds * 1000;
+
+    this.state.currentRound = {
+      number: roundNumber,
+      song,
+      activeTeam,
+      phase: 'guessing',
+      startedAt: now,
+      endsAt: now + roundDuration,
+      currentAnswer: null,
+    };
+
+    this.state.lastActivityAt = now;
+    await this.persistState();
+
+    return { success: true };
+  }
+
+  async submitAnswer(answer: Answer): Promise<{ success: boolean; error?: string }> {
+    if (!this.state || !this.state.currentRound) {
+      return { success: false, error: 'No active round' };
+    }
+
+    if (this.state.currentRound.phase !== 'guessing') {
+      return { success: false, error: 'Round is not in guessing phase' };
+    }
+
+    // Store answer
+    this.state.currentRound.currentAnswer = answer;
+
+    // Transition to reveal phase
+    this.state.currentRound.phase = 'reveal';
+    this.state.lastActivityAt = Date.now();
+    await this.persistState();
+
+    return { success: true };
+  }
+
+  async completeRound(): Promise<{ success: boolean; error?: string; gameFinished?: boolean }> {
+    if (!this.state || !this.state.currentRound) {
+      return { success: false, error: 'No active round' };
+    }
+
+    const round = this.state.currentRound;
+    const answer = round.currentAnswer;
+    const activeTeam = this.state.teams[round.activeTeam];
+
+    // Calculate score (binary: all correct = 1 point, otherwise 0)
+    if (answer) {
+      const artistCorrect = answer.artist.toLowerCase().trim() === round.song.artist.toLowerCase().trim();
+      const titleCorrect = answer.title.toLowerCase().trim() === round.song.title.toLowerCase().trim();
+      const yearCorrect = answer.year === round.song.year;
+
+      if (artistCorrect && titleCorrect && yearCorrect) {
+        activeTeam.score += 1;
+
+        // Add to timeline
+        activeTeam.timeline.push({
+          ...round.song,
+          addedAt: Date.now(),
+          pointsEarned: 1,
+        });
+      }
+    }
+
+    // Check if game is finished
+    const gameFinished = activeTeam.score >= this.state.settings.targetScore;
+
+    if (gameFinished) {
+      this.state.status = 'finished';
+      this.state.currentRound = null;
+    } else {
+      // Transition to waiting phase
+      this.state.currentRound.phase = 'waiting';
+    }
+
+    this.state.lastActivityAt = Date.now();
+    await this.persistState();
+
+    return { success: true, gameFinished };
+  }
+
   // Broadcast methods
   private sendStateSync(ws: WebSocket, player: Player): void {
     if (!this.state) return;
@@ -322,7 +428,10 @@ export class Game extends DurableObject {
   broadcast(message: unknown, excludeWs?: WebSocket): void {
     const messageStr = JSON.stringify(message);
 
-    for (const [ws] of this.connections) {
+    // Use ctx.getWebSockets() to get all active connections (survives hibernation)
+    const allWebSockets = this.ctx.getWebSockets();
+
+    for (const ws of allWebSockets) {
       if (ws !== excludeWs) {
         this.sendToWs(ws, message, messageStr);
       }
@@ -343,7 +452,10 @@ export class Game extends DurableObject {
   async sendHeartbeat(): Promise<void> {
     const pingMessage = JSON.stringify({ type: 'ping', payload: {} });
 
-    for (const [ws] of this.connections) {
+    // Use ctx.getWebSockets() to get all active connections
+    const allWebSockets = this.ctx.getWebSockets();
+
+    for (const ws of allWebSockets) {
       if ((ws as any).readyState === 1) {
         this.sendToWs(ws, pingMessage, pingMessage);
         this.recordPingSent(ws);
@@ -510,6 +622,11 @@ export class Game extends DurableObject {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    // Load state if not already loaded (can happen after hibernation)
+    if (!this.state) {
+      await this.loadState();
+    }
+
     const data = typeof message === 'string' ? message : new TextDecoder().decode(message);
 
     try {
@@ -552,7 +669,14 @@ export class Game extends DurableObject {
         case 'start_game':
           const transitionResult = await this.transitionTo('playing');
           if (transitionResult.success) {
+            // Broadcast that game started
             this.broadcast({ type: 'game_started', payload: {} });
+
+            // Also broadcast updated state so all clients get the new status
+            this.broadcast({
+              type: 'state_sync',
+              payload: { gameState: this.state }
+            });
           } else {
             this.sendToWs(ws, { type: 'error', payload: { message: transitionResult.error } });
           }
@@ -568,8 +692,30 @@ export class Game extends DurableObject {
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
-    this.connections.delete(ws);
     console.log(`WebSocket closed: ${code} ${reason}`);
+
+    // Handle player disconnect
+    const sessionId = this.wsToPlayer.get(ws);
+    if (sessionId) {
+      const player = this.findPlayerBySession(sessionId);
+      if (player) {
+        // Mark player as disconnected
+        player.connected = false;
+        player.lastSeen = Date.now();
+
+        // Broadcast player_left to all other connections
+        this.broadcast({
+          type: 'player_left',
+          payload: { playerId: player.id }
+        });
+
+        await this.persistState();
+      }
+
+      this.wsToPlayer.delete(ws);
+    }
+
+    this.connections.delete(ws);
   }
 
   async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
