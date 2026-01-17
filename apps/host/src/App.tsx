@@ -3,6 +3,7 @@ import { useGameConnection, type WebSocketMessage } from './hooks/useGameConnect
 import { useGameStore } from './store/gameStore';
 import { LobbyScreen } from './components/LobbyScreen';
 import { GameplayScreen } from './components/GameplayScreen';
+import { VictoryScreen } from './components/VictoryScreen';
 import { ConnectionStatus } from './components/ConnectionStatus';
 import { ToastContainer, useToasts } from './components/Toast';
 import { TVLayout } from './components/TVLayout';
@@ -231,6 +232,32 @@ function App() {
         <GameplayScreen
           game={game}
           onNextRound={handleNextRound}
+        />
+      </>
+    );
+  }
+
+  // Finished screen
+  if (screen === 'finished' && game) {
+    // Determine winner
+    const teamAScore = game.teams.A.score;
+    const teamBScore = game.teams.B.score;
+    const winnerTeam = teamAScore > teamBScore ? 'A' : 'B';
+    const winnerName = game.teams[winnerTeam].name;
+
+    return (
+      <>
+        <ConnectionStatus state={connectionState} />
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        <VictoryScreen
+          winnerName={winnerName}
+          winnerTeam={winnerTeam}
+          teamAScore={teamAScore}
+          teamBScore={teamBScore}
+          teamATimeline={game.teams.A.timeline}
+          teamBTimeline={game.teams.B.timeline}
+          teamAName={game.teams.A.name}
+          teamBName={game.teams.B.name}
         />
       </>
     );
