@@ -132,6 +132,12 @@ export class Game extends DurableObject {
 
     this.state.lastActivityAt = Date.now();
     await this.persistState();
+
+    // Send state sync to newly joined player
+    this.sendStateSync(ws, player);
+
+    // Broadcast player joined to all other players
+    this.broadcast({ type: 'player_joined', payload: { player } }, ws);
   }
 
   async handleLeave(ws: WebSocket): Promise<void> {
@@ -237,6 +243,42 @@ export class Game extends DurableObject {
     const teamBCount = this.state.teams.B.players.length;
 
     return teamACount <= teamBCount ? 'A' : 'B';
+  }
+
+  // Broadcast methods
+  private sendStateSync(ws: WebSocket, player: Player): void {
+    if (!this.state) return;
+
+    const message = {
+      type: 'state_sync',
+      payload: {
+        gameState: this.state,
+        playerId: player.id,
+        sessionId: player.sessionId,
+      },
+    };
+
+    this.sendToWs(ws, message);
+  }
+
+  broadcast(message: unknown, excludeWs?: WebSocket): void {
+    const messageStr = JSON.stringify(message);
+
+    for (const [ws] of this.connections) {
+      if (ws !== excludeWs) {
+        this.sendToWs(ws, message, messageStr);
+      }
+    }
+  }
+
+  private sendToWs(ws: WebSocket, message: unknown, messageStr?: string): void {
+    try {
+      if ((ws as any).readyState === 1) {
+        ws.send(messageStr || JSON.stringify(message));
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
   }
 
   private async persistState(): Promise<void> {
