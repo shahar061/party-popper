@@ -1,0 +1,14 @@
+created: "2026-01-17T10:00:00Z"
+updated: "2026-01-17T10:15:00Z"
+topic: "Party Popper - Music Timeline Game"
+status: "imagine_complete"
+current_phase: "complete"
+completed_phases: ["discovery", "definition", "validation", "architecture"]
+context:
+  target_users: "Families and friend groups hosting game nights"
+  core_problem: "Physical music board games have fixed libraries and require components"
+  key_decisions:
+    - "Spotify integration via QR deeplinks (legal workaround)"
+    - "Two game modes: Classic (100 curated songs) and Custom (user playlists)"
+    - "Web host + mobile player architecture"
+    - "Team-based with veto/token mechanic"
