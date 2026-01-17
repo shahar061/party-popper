@@ -294,6 +294,23 @@ export class Game extends DurableObject {
     return { success: true };
   }
 
+  async handlePlayerReady(playerId: string): Promise<void> {
+    if (!this.state) return;
+
+    const player = this.findPlayerById(playerId);
+    if (!player) return;
+
+    // Broadcast to all clients that player is ready
+    this.broadcast({
+      type: 'player_ready_notification',
+      payload: {
+        playerId,
+        playerName: player.name,
+        readyAt: Date.now()
+      }
+    });
+  }
+
   private getTeamWithFewerPlayers(): 'A' | 'B' {
     if (!this.state) return 'A';
 
@@ -683,6 +700,12 @@ export class Game extends DurableObject {
             }
           } else {
             this.sendToWs(ws, { type: 'error', payload: { message: transitionResult.error } });
+          }
+          break;
+
+        case 'player_ready':
+          if (payload && payload.playerId) {
+            await this.handlePlayerReady(payload.playerId);
           }
           break;
 

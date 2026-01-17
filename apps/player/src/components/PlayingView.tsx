@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { GameState } from '@party-popper/shared';
 import { Layout } from './Layout';
 import { TurnStatus } from './TurnStatus';
@@ -8,6 +9,7 @@ interface PlayingViewProps {
   playerId: string;
   onSubmitAnswer: (data: { artist: string; title: string; year: number }) => void;
   onTyping: (field: string, value: string) => void;
+  onReady: () => void;
 }
 
 export function PlayingView({
@@ -15,8 +17,10 @@ export function PlayingView({
   playerId,
   onSubmitAnswer,
   onTyping,
+  onReady,
 }: PlayingViewProps) {
   const { currentRound, teams } = gameState;
+  const [confirmed, setConfirmed] = useState(false);
 
   // Find which team the player is on
   const playerTeam = teams.A.players.find(p => p.id === playerId) ? 'A' : 'B';
@@ -58,13 +62,39 @@ export function PlayingView({
         {/* Conditional Content */}
         {canSubmitAnswer ? (
           <>
-            <h2 className="text-2xl font-bold text-white text-center">
-              Submit Your Answer
-            </h2>
-            <AnswerForm
-              onSubmit={onSubmitAnswer}
-              onTyping={onTyping}
-            />
+            {/* Ready Button - Show before answer form if not confirmed */}
+            {!confirmed && (
+              <div className="text-center space-y-6 mb-6">
+                <div className="text-xl text-white">
+                  Scan the QR code on the TV to hear the song!
+                </div>
+                <button
+                  onClick={() => {
+                    onReady();
+                    setConfirmed(true);
+                  }}
+                  className="px-8 py-4 bg-green-500 hover:bg-green-600 text-white text-xl font-bold rounded-lg transition-colors"
+                >
+                  Ready! I'm Listening
+                </button>
+                <div className="text-sm text-gray-400">
+                  (Tap when you've scanned and started the song)
+                </div>
+              </div>
+            )}
+
+            {/* Answer Form - Show after ready confirmation */}
+            {confirmed && (
+              <>
+                <h2 className="text-2xl font-bold text-white text-center">
+                  Submit Your Answer
+                </h2>
+                <AnswerForm
+                  onSubmit={onSubmitAnswer}
+                  onTyping={onTyping}
+                />
+              </>
+            )}
           </>
         ) : (
           <div className="text-center space-y-4">

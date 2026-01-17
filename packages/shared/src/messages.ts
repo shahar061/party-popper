@@ -8,6 +8,7 @@ export type ClientMessageType =
   | 'leave'
   | 'reconnect'
   | 'start_game'
+  | 'player_ready'
   | 'submit_answer'
   | 'use_veto'
   | 'typing'
@@ -24,6 +25,7 @@ export type ClientMessage =
   | LeaveMessage
   | ReconnectMessage
   | StartGameMessage
+  | PlayerReadyMessage
   | SubmitAnswerMessage
   | TypingMessage
   | UseVetoMessage
@@ -55,6 +57,13 @@ export interface ReconnectMessage {
 
 export interface StartGameMessage {
   type: 'start_game';
+}
+
+export interface PlayerReadyMessage {
+  type: 'player_ready';
+  payload: {
+    playerId: string;
+  };
 }
 
 export interface SubmitAnswerMessage {
@@ -108,6 +117,7 @@ export type ServerMessage =
   | PlayerJoinedMessage
   | PlayerLeftMessage
   | PlayerReconnectedMessage
+  | PlayerReadyNotificationMessage
   | TeamChangedMessage
   | SettingsUpdatedMessage
   | GameStartedMessage
@@ -147,6 +157,15 @@ export interface PlayerReconnectedMessage {
   type: 'player_reconnected';
   payload: {
     player: Player;
+  };
+}
+
+export interface PlayerReadyNotificationMessage {
+  type: 'player_ready_notification';
+  payload: {
+    playerId: string;
+    playerName: string;
+    readyAt: number;
   };
 }
 

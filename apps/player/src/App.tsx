@@ -4,7 +4,7 @@ import { JoinScreen } from './components/JoinScreen';
 import { LobbyView } from './components/LobbyView';
 import { PlayingView } from './components/PlayingView';
 import { ConnectionStatus } from './components/ConnectionStatus';
-import type { GameState, Player, SubmitAnswerMessage } from '@party-popper/shared';
+import type { GameState, Player, SubmitAnswerMessage, PlayerReadyMessage } from '@party-popper/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
@@ -192,6 +192,20 @@ function App() {
     // No-op for minimal v1 - typing state not synced
   }, []);
 
+  // Handler for ready button
+  const handleReady = useCallback(() => {
+    if (!wsRef.current || !playerState) return;
+
+    const message: PlayerReadyMessage = {
+      type: 'player_ready',
+      payload: {
+        playerId: playerState.playerId,
+      },
+    };
+
+    wsRef.current.send(JSON.stringify(message));
+  }, [playerState]);
+
   // Cleanup WebSocket on unmount
   useEffect(() => {
     return () => {
@@ -226,6 +240,7 @@ function App() {
           playerId={playerState.playerId}
           onSubmitAnswer={handleSubmitAnswer}
           onTyping={handleTyping}
+          onReady={handleReady}
         />
       )}
     </Layout>
