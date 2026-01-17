@@ -1,0 +1,781 @@
+version: "1.0"
+project: "Party Popper"
+description: "Digital music timeline game with real-time multiplayer via Cloudflare Workers and Durable Objects"
+
+required_permissions:
+  - git
+  - pnpm
+
+phases:
+  - id: phase-1
+    name: Project Foundation
+    depends_on: []
+    tasks:
+      - id: setup-001
+        description: "Initialize monorepo structure with apps/host, apps/player, packages/shared, packages/backend directories"
+        agent: backend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "Directory structure exists: apps/host, apps/player, packages/shared, packages/backend"
+          - "Root package.json with workspaces configured"
+          - "pnpm-workspace.yaml configured for monorepo"
+
+      - id: setup-002
+        description: "Configure TypeScript with shared tsconfig base and project references"
+        agent: backend-engineer
+        depends_on: [setup-001]
+        acceptance_criteria:
+          - "tsconfig.base.json exists at root with strict settings"
+          - "Each package has tsconfig.json extending base"
+          - "Project references configured for cross-package imports"
+
+      - id: setup-003
+        description: "Set up Vite for host app with React 18 and TypeScript"
+        agent: frontend-engineer
+        depends_on: [setup-002]
+        acceptance_criteria:
+          - "apps/host has vite.config.ts configured"
+          - "React 18 installed and working"
+          - "pnpm dev starts host app on localhost"
+
+      - id: setup-004
+        description: "Set up Vite for player app with React 18 and TypeScript"
+        agent: frontend-engineer
+        depends_on: [setup-002]
+        acceptance_criteria:
+          - "apps/player has vite.config.ts configured"
+          - "React 18 installed and working"
+          - "pnpm dev starts player app on localhost"
+
+      - id: setup-005
+        description: "Configure Tailwind CSS for host and player apps"
+        agent: frontend-engineer
+        depends_on: [setup-003, setup-004]
+        acceptance_criteria:
+          - "tailwind.config.js in each app"
+          - "Shared color palette and theme tokens"
+          - "Test component renders with Tailwind classes"
+
+      - id: setup-006
+        description: "Create Cloudflare Worker project with Durable Object stub"
+        agent: backend-engineer
+        depends_on: [setup-002]
+        acceptance_criteria:
+          - "packages/backend has Worker entry point"
+          - "Durable Object class stub exported"
+          - "wrangler.toml configured with bindings"
+
+      - id: setup-007
+        description: "Set up Wrangler configuration for local development"
+        agent: backend-engineer
+        depends_on: [setup-006]
+        acceptance_criteria:
+          - "wrangler dev starts local Worker"
+          - "Durable Objects work in local mode"
+          - "CORS configured for local frontend origins"
+
+      - id: setup-008
+        description: "Create shared types package with core TypeScript interfaces"
+        agent: backend-engineer
+        depends_on: [setup-002]
+        acceptance_criteria:
+          - "packages/shared/src/types.ts exports GameState, Player, Team, Song, Round interfaces"
+          - "WebSocket message types defined"
+          - "Types importable from both apps and backend"
+
+      - id: setup-009
+        description: "Configure Cloudflare Pages deployment for frontends"
+        agent: devops
+        depends_on: [setup-003, setup-004]
+        acceptance_criteria:
+          - "Host app deploys to Cloudflare Pages"
+          - "Player app deploys to Cloudflare Pages"
+          - "Build commands work in CI environment"
+
+      - id: setup-010
+        description: "Set up GitHub Actions CI/CD pipeline"
+        agent: devops
+        depends_on: [setup-009]
+        acceptance_criteria:
+          - ".github/workflows/deploy.yml exists"
+          - "Lint, type-check, and build run on PR"
+          - "Deploy triggers on main branch merge"
+
+      - id: setup-011
+        description: "Verify local dev environment with Worker and both frontends"
+        agent: backend-engineer
+        depends_on: [setup-007, setup-005]
+        acceptance_criteria:
+          - "All three services start with single command"
+          - "Frontend can reach Worker API endpoint"
+          - "No CORS errors in browser console"
+
+  - id: phase-2
+    name: Backend Core - Game State and Real-time Infrastructure
+    depends_on: [phase-1]
+    tasks:
+      - id: backend-001
+        description: "Implement Game Durable Object class with WebSocket handling"
+        agent: backend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "GameDO class extends DurableObject"
+          - "fetch() method accepts WebSocket upgrade requests"
+          - "webSocketMessage() and webSocketClose() handlers implemented"
+
+      - id: backend-002
+        description: "Create game state management with lobby, playing, finished states"
+        agent: backend-engineer
+        depends_on: [backend-001]
+        acceptance_criteria:
+          - "GameState interface tracks current phase"
+          - "State transitions validated (lobby->playing->finished)"
+          - "State persisted to Durable Object storage"
+
+      - id: backend-003
+        description: "Implement REST endpoints for game creation and info"
+        agent: backend-engineer
+        depends_on: [backend-001]
+        acceptance_criteria:
+          - "POST /api/games creates new game, returns join code"
+          - "GET /api/games/:code returns game info and WebSocket URL"
+          - "404 returned for invalid codes"
+
+      - id: backend-004
+        description: "Implement join code generation (4-char alphanumeric, collision-safe)"
+        agent: backend-engineer
+        depends_on: [backend-003]
+        acceptance_criteria:
+          - "Codes are 4 uppercase alphanumeric characters"
+          - "Excludes ambiguous characters (0, O, I, L)"
+          - "Collision check before returning code"
+
+      - id: backend-005
+        description: "Build WebSocket message router with type-safe handlers"
+        agent: backend-engineer
+        depends_on: [backend-001]
+        acceptance_criteria:
+          - "Message types defined in shared package"
+          - "Router dispatches to correct handler by message type"
+          - "Unknown message types return error response"
+
+      - id: backend-006
+        description: "Implement player join/leave logic with session tracking"
+        agent: backend-engineer
+        depends_on: [backend-005]
+        acceptance_criteria:
+          - "JOIN message creates player with unique session ID"
+          - "Player stored in game state with name and team"
+          - "LEAVE or disconnect removes player from state"
+
+      - id: backend-007
+        description: "Implement team assignment (auto-assign and manual reassign)"
+        agent: backend-engineer
+        depends_on: [backend-006]
+        acceptance_criteria:
+          - "New players auto-assigned to team with fewer members"
+          - "REASSIGN_TEAM message moves player between teams"
+          - "Max 5 players per team enforced"
+
+      - id: backend-008
+        description: "Build state broadcast mechanism with full sync and delta updates"
+        agent: backend-engineer
+        depends_on: [backend-005]
+        acceptance_criteria:
+          - "STATE_SYNC message sent on player connect"
+          - "STATE_DELTA messages sent on state changes"
+          - "All connected clients receive broadcasts"
+
+      - id: backend-009
+        description: "Add heartbeat/ping-pong for connection health"
+        agent: backend-engineer
+        depends_on: [backend-005]
+        acceptance_criteria:
+          - "Server sends PING every 30 seconds"
+          - "Client must respond with PONG within 10 seconds"
+          - "Connection closed if PONG not received"
+
+      - id: backend-010
+        description: "Implement player reconnection with session recovery"
+        agent: backend-engineer
+        depends_on: [backend-006]
+        acceptance_criteria:
+          - "Session ID stored in player record"
+          - "RECONNECT message with session ID restores player"
+          - "5-minute window for reconnection"
+
+      - id: backend-011
+        description: "Create curated 100-song pool JSON (20 songs per decade: 1970s-2010s)"
+        agent: backend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "packages/backend/data/songs.json exists"
+          - "100 songs with artist, title, year, spotifyId"
+          - "20 songs each from 1970s, 1980s, 1990s, 2000s, 2010s"
+
+      - id: backend-012
+        description: "Add song pool loading for Classic mode"
+        agent: backend-engineer
+        depends_on: [backend-011, backend-002]
+        acceptance_criteria:
+          - "Song pool loaded on game creation in Classic mode"
+          - "Songs shuffled randomly for each game"
+          - "Used songs tracked to prevent repeats"
+
+      - id: backend-013
+        description: "Write integration tests for Durable Object behavior"
+        agent: automation-developer
+        depends_on: [backend-010]
+        acceptance_criteria:
+          - "Tests for game creation, player join/leave"
+          - "Tests for state transitions"
+          - "Tests for reconnection flow"
+
+  - id: phase-3
+    name: Host Display Foundation
+    depends_on: [phase-2]
+    tasks:
+      - id: host-001
+        description: "Create WebSocket connection hook with reconnection logic"
+        agent: frontend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "useGameConnection hook connects to Worker WebSocket"
+          - "Auto-reconnect on disconnect with exponential backoff"
+          - "Connection state exposed (connecting, connected, disconnected)"
+
+      - id: host-002
+        description: "Build game state context/store using Zustand"
+        agent: frontend-engineer
+        depends_on: [host-001]
+        acceptance_criteria:
+          - "Zustand store with GameState shape"
+          - "Actions for all state mutations"
+          - "Syncs with WebSocket STATE_SYNC messages"
+
+      - id: host-003
+        description: "Design and implement lobby screen with join code display"
+        agent: frontend-engineer
+        depends_on: [host-002]
+        acceptance_criteria:
+          - "Large, readable join code display (TV-optimized)"
+          - "Game URL shown below code"
+          - "Animated waiting indicator"
+
+      - id: host-004
+        description: "Generate QR code for player join URL"
+        agent: frontend-engineer
+        depends_on: [host-003]
+        acceptance_criteria:
+          - "QR code generated with qrcode.react"
+          - "QR encodes full join URL with code parameter"
+          - "Size appropriate for TV viewing (min 200px)"
+
+      - id: host-005
+        description: "Build team roster display with player names"
+        agent: frontend-engineer
+        depends_on: [host-002]
+        acceptance_criteria:
+          - "Team A and Team B columns shown"
+          - "Player names displayed with join animation"
+          - "Empty slots shown for available positions"
+
+      - id: host-006
+        description: "Implement team reassignment UI with buttons"
+        agent: frontend-engineer
+        depends_on: [host-005]
+        acceptance_criteria:
+          - "Move buttons next to each player name"
+          - "Click sends REASSIGN_TEAM message"
+          - "UI updates optimistically"
+
+      - id: host-007
+        description: "Create game settings panel (target score, mode selection)"
+        agent: frontend-engineer
+        depends_on: [host-003]
+        acceptance_criteria:
+          - "Target score selector (5, 10, 15, 20)"
+          - "Mode toggle (Classic / Custom)"
+          - "Settings sent to backend on change"
+
+      - id: host-008
+        description: "Build Start Game flow with validation"
+        agent: frontend-engineer
+        depends_on: [host-005, host-007]
+        acceptance_criteria:
+          - "Start button disabled until 1+ player per team"
+          - "Click sends START_GAME message"
+          - "Transitions to gameplay screen on success"
+
+      - id: host-009
+        description: "Design TV-optimized layout with high contrast theme"
+        agent: frontend-engineer
+        depends_on: [host-003]
+        acceptance_criteria:
+          - "Minimum font size 24px for body text"
+          - "High contrast color scheme (dark background, light text)"
+          - "Readable from 3 meters distance"
+
+      - id: host-010
+        description: "Implement connection status indicators"
+        agent: frontend-engineer
+        depends_on: [host-001]
+        acceptance_criteria:
+          - "Connection dot (green=connected, yellow=reconnecting, red=disconnected)"
+          - "Reconnection countdown shown when disconnected"
+          - "Toast notification on connection state changes"
+
+      - id: host-011
+        description: "Add error handling and user feedback toasts"
+        agent: frontend-engineer
+        depends_on: [host-002]
+        acceptance_criteria:
+          - "Toast component for success/error/info messages"
+          - "WebSocket errors shown to user"
+          - "Auto-dismiss after 5 seconds"
+
+  - id: phase-4
+    name: Mobile Player Interface
+    depends_on: [phase-3]
+    tasks:
+      - id: player-001
+        description: "Create mobile-optimized layout and navigation"
+        agent: frontend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "Viewport meta tag configured for mobile"
+          - "Touch-friendly sizing (min 44px touch targets)"
+          - "No horizontal scroll on any screen"
+
+      - id: player-002
+        description: "Build join screen with code entry and name input"
+        agent: frontend-engineer
+        depends_on: [player-001]
+        acceptance_criteria:
+          - "4-character code input with auto-uppercase"
+          - "Name input with 20-char limit"
+          - "Join button sends JOIN message"
+
+      - id: player-003
+        description: "Implement WebSocket connection with shared hooks"
+        agent: frontend-engineer
+        depends_on: [player-002]
+        acceptance_criteria:
+          - "Reuses useGameConnection from packages/shared"
+          - "Connects after successful code validation"
+          - "Handles connection errors gracefully"
+
+      - id: player-004
+        description: "Create team assignment confirmation screen"
+        agent: frontend-engineer
+        depends_on: [player-003]
+        acceptance_criteria:
+          - "Shows assigned team name and color"
+          - "Lists teammates"
+          - "Waiting for game start message"
+
+      - id: player-005
+        description: "Build waiting/lobby view showing other players"
+        agent: frontend-engineer
+        depends_on: [player-004]
+        acceptance_criteria:
+          - "Shows all players in both teams"
+          - "Updates in real-time as players join/leave"
+          - "Indicates when game is about to start"
+
+      - id: player-006
+        description: "Design touch-friendly input components for gameplay"
+        agent: frontend-engineer
+        depends_on: [player-001]
+        acceptance_criteria:
+          - "Large text inputs with clear labels"
+          - "Number input with large +/- buttons for year"
+          - "Submit button prominent and easily tappable"
+
+      - id: player-007
+        description: "Implement connection status and reconnection UI"
+        agent: frontend-engineer
+        depends_on: [player-003]
+        acceptance_criteria:
+          - "Connection status shown in header"
+          - "Reconnecting overlay with progress"
+          - "Session ID stored in localStorage for reconnection"
+
+      - id: player-008
+        description: "Add localStorage session persistence for reconnection"
+        agent: frontend-engineer
+        depends_on: [player-007]
+        acceptance_criteria:
+          - "Session ID and game code saved to localStorage"
+          - "Auto-reconnect attempted on app reload"
+          - "Clear session on explicit leave or timeout"
+
+      - id: player-009
+        description: "Handle mobile browser quirks (iOS Safari, Android Chrome)"
+        agent: frontend-engineer
+        depends_on: [player-006]
+        acceptance_criteria:
+          - "iOS Safari viewport height handled (100dvh)"
+          - "Input zoom prevented with font-size 16px+"
+          - "Keyboard handling for form inputs"
+
+      - id: player-010
+        description: "Test responsive behavior across device sizes"
+        agent: automation-developer
+        depends_on: [player-009]
+        acceptance_criteria:
+          - "Works on iPhone SE (375px width)"
+          - "Works on iPhone 14 Pro Max (430px width)"
+          - "Works on Android devices (360px-412px width)"
+
+  - id: phase-5
+    name: Core Gameplay Loop
+    depends_on: [phase-4]
+    tasks:
+      - id: gameplay-001
+        description: "Backend: Implement round state machine (guessing -> reveal -> next)"
+        agent: backend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "Round states: guessing, reveal, next"
+          - "Timer for guessing phase (configurable, default 60s)"
+          - "Auto-transition on timeout or submission"
+
+      - id: gameplay-002
+        description: "Backend: Build answer submission and validation logic"
+        agent: backend-engineer
+        depends_on: [gameplay-001]
+        acceptance_criteria:
+          - "SUBMIT_ANSWER message with artist, title, year"
+          - "Only active team can submit"
+          - "Fuzzy matching for artist/title (case-insensitive, ignore 'the')"
+
+      - id: gameplay-003
+        description: "Backend: Implement scoring system (partial credit)"
+        agent: backend-engineer
+        depends_on: [gameplay-002]
+        acceptance_criteria:
+          - "1 point for correct artist"
+          - "1 point for correct title"
+          - "1 point for exact year (0.5 for +/- 1 year)"
+          - "Song added to timeline if any points scored"
+
+      - id: gameplay-004
+        description: "Backend: Add timeline management (chronological ordering)"
+        agent: backend-engineer
+        depends_on: [gameplay-003]
+        acceptance_criteria:
+          - "Songs inserted in year order"
+          - "Timeline stored per team in game state"
+          - "Duplicate song prevention"
+
+      - id: gameplay-005
+        description: "Backend: Implement turn rotation between teams"
+        agent: backend-engineer
+        depends_on: [gameplay-001]
+        acceptance_criteria:
+          - "Active team tracked in game state"
+          - "Turn passes after round completion"
+          - "Alternates: Team A -> Team B -> Team A..."
+
+      - id: gameplay-006
+        description: "Backend: Add win condition detection"
+        agent: backend-engineer
+        depends_on: [gameplay-004]
+        acceptance_criteria:
+          - "Check timeline length after each round"
+          - "Game ends when team reaches target score"
+          - "Winner stored in game state"
+
+      - id: gameplay-007
+        description: "Host: Build current round display with song QR code"
+        agent: frontend-engineer
+        depends_on: [gameplay-001]
+        acceptance_criteria:
+          - "QR code shows Spotify deeplink (spotify:track:ID)"
+          - "Song hidden until reveal phase"
+          - "Timer countdown visible"
+
+      - id: gameplay-008
+        description: "Host: Create answer input area showing team submission"
+        agent: frontend-engineer
+        depends_on: [gameplay-007]
+        acceptance_criteria:
+          - "Shows current team name prominently"
+          - "Artist, title, year fields displayed"
+          - "Updates in real-time as team types"
+
+      - id: gameplay-009
+        description: "Host: Implement real-time typing indicators"
+        agent: frontend-engineer
+        depends_on: [gameplay-008]
+        acceptance_criteria:
+          - "Characters appear as player types"
+          - "Smooth animation for character updates"
+          - "Gameshow-style dramatic effect"
+
+      - id: gameplay-010
+        description: "Host: Build timeline visualization (side-by-side, chronological)"
+        agent: frontend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "Two columns for Team A and Team B"
+          - "Songs listed by year ascending"
+          - "Each song shows: year, title, artist"
+
+      - id: gameplay-011
+        description: "Host: Create round result reveal animation"
+        agent: frontend-engineer
+        depends_on: [gameplay-008]
+        acceptance_criteria:
+          - "Correct answer revealed dramatically"
+          - "Points awarded shown with animation"
+          - "Song added to timeline with highlight"
+
+      - id: gameplay-012
+        description: "Host: Add score display and turn indicator"
+        agent: frontend-engineer
+        depends_on: [gameplay-010]
+        acceptance_criteria:
+          - "Score shown prominently for each team"
+          - "Active team highlighted"
+          - "Turn indicator arrow or glow effect"
+
+      - id: gameplay-013
+        description: "Player: Build answer submission form"
+        agent: frontend-engineer
+        depends_on: [gameplay-002]
+        acceptance_criteria:
+          - "Artist text input"
+          - "Title text input"
+          - "Year number input (1950-2030 range)"
+          - "Submit button with loading state"
+
+      - id: gameplay-014
+        description: "Player: Implement typing broadcast for real-time display"
+        agent: frontend-engineer
+        depends_on: [gameplay-013]
+        acceptance_criteria:
+          - "TYPING message sent on input change"
+          - "Debounced to max 10 messages per second"
+          - "Only sent when player is on active team"
+
+      - id: gameplay-015
+        description: "Player: Add turn awareness (active vs waiting state)"
+        agent: frontend-engineer
+        depends_on: [gameplay-013]
+        acceptance_criteria:
+          - "Form enabled only on team's turn"
+          - "Waiting message shown when not active"
+          - "Visual distinction between active/waiting"
+
+      - id: gameplay-016
+        description: "Player: Create answer confirmation and feedback UI"
+        agent: frontend-engineer
+        depends_on: [gameplay-013]
+        acceptance_criteria:
+          - "Submission confirmed with checkmark"
+          - "Result shown after reveal (correct/incorrect)"
+          - "Points earned displayed"
+
+      - id: gameplay-017
+        description: "Test full gameplay loop with multiple players"
+        agent: automation-developer
+        depends_on: [gameplay-016]
+        acceptance_criteria:
+          - "End-to-end test: create game, join players, play rounds, win"
+          - "Tests run in CI"
+          - "No race conditions or sync issues"
+
+  - id: phase-6
+    name: Advanced Features and Polish
+    depends_on: [phase-5]
+    tasks:
+      - id: advanced-001
+        description: "Backend: Implement veto token system (3 tokens per team)"
+        agent: backend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "Teams start with 3 veto tokens"
+          - "Token count tracked in game state"
+          - "Cannot veto with 0 tokens"
+
+      - id: advanced-002
+        description: "Backend: Add veto window phase after answer submission"
+        agent: backend-engineer
+        depends_on: [advanced-001]
+        acceptance_criteria:
+          - "Round state: guessing -> veto_window -> reveal"
+          - "Veto window lasts 15 seconds"
+          - "VETO message processed during window"
+
+      - id: advanced-003
+        description: "Backend: Handle veto resolution (steal or penalty)"
+        agent: backend-engineer
+        depends_on: [advanced-002]
+        acceptance_criteria:
+          - "If veto correct: vetoing team gets steal opportunity"
+          - "If veto incorrect: vetoing team loses token only"
+          - "Steal follows same answer/scoring flow"
+
+      - id: advanced-004
+        description: "Backend: Implement tiebreaker round logic"
+        agent: backend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "Tiebreaker triggers when both teams at target-1 and tie on same round"
+          - "Same song played to both teams"
+          - "First correct answer wins"
+
+      - id: advanced-005
+        description: "Backend: Build Custom mode song entry and validation"
+        agent: backend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "ADD_SONG message with artist, title, year, spotifyId"
+          - "Validates Spotify ID format"
+          - "Minimum song count before game start"
+
+      - id: advanced-006
+        description: "Host: Create veto challenge UI with timer countdown"
+        agent: frontend-engineer
+        depends_on: [advanced-002]
+        acceptance_criteria:
+          - "Veto window overlay with countdown"
+          - "Shows which team can veto"
+          - "Dramatic tension animation"
+
+      - id: advanced-007
+        description: "Host: Display veto token counts for both teams"
+        agent: frontend-engineer
+        depends_on: [advanced-001]
+        acceptance_criteria:
+          - "Token icons shown per team (3 max)"
+          - "Used tokens visually dimmed"
+          - "Animation when token is used"
+
+      - id: advanced-008
+        description: "Host: Build veto result animation"
+        agent: frontend-engineer
+        depends_on: [advanced-003]
+        acceptance_criteria:
+          - "Success: dramatic steal opportunity reveal"
+          - "Failure: token lost with penalty animation"
+          - "Sound-ready (visual cue for sound timing)"
+
+      - id: advanced-009
+        description: "Host: Implement tiebreaker screen"
+        agent: frontend-engineer
+        depends_on: [advanced-004]
+        acceptance_criteria:
+          - "Both teams highlighted as active"
+          - "Race-style UI with both answer areas"
+          - "Winner announcement with celebration"
+
+      - id: advanced-010
+        description: "Host: Create victory celebration screen"
+        agent: frontend-engineer
+        depends_on: []
+        acceptance_criteria:
+          - "Winning team prominently displayed"
+          - "Final scores and timelines shown"
+          - "Confetti or celebration animation"
+
+      - id: advanced-011
+        description: "Host: Add Play Again and End Session options"
+        agent: frontend-engineer
+        depends_on: [advanced-010]
+        acceptance_criteria:
+          - "Play Again resets state, keeps players"
+          - "End Session closes game, disconnects all"
+          - "Confirmation dialog for End Session"
+
+      - id: advanced-012
+        description: "Player: Build veto button with confirmation"
+        agent: frontend-engineer
+        depends_on: [advanced-002]
+        acceptance_criteria:
+          - "Veto button shown during veto window"
+          - "Confirmation dialog before sending"
+          - "Disabled if team has 0 tokens"
+
+      - id: advanced-013
+        description: "Player: Add veto window countdown display"
+        agent: frontend-engineer
+        depends_on: [advanced-012]
+        acceptance_criteria:
+          - "Countdown timer visible"
+          - "Urgency indication as time runs out"
+          - "Clear when window closes"
+
+      - id: advanced-014
+        description: "Player: Implement tiebreaker rapid-answer UI"
+        agent: frontend-engineer
+        depends_on: [advanced-004]
+        acceptance_criteria:
+          - "Both teams can answer simultaneously"
+          - "Speed-optimized input layout"
+          - "Immediate feedback on submission"
+
+      - id: advanced-015
+        description: "Host: Build Custom mode song entry interface"
+        agent: frontend-engineer
+        depends_on: [advanced-005]
+        acceptance_criteria:
+          - "Form for artist, title, year, Spotify link"
+          - "Spotify link validated and converted to ID"
+          - "Song list with delete option"
+
+      - id: advanced-016
+        description: "Test veto mechanics thoroughly"
+        agent: automation-developer
+        depends_on: [advanced-003]
+        acceptance_criteria:
+          - "Test successful veto with steal"
+          - "Test failed veto (answer was correct)"
+          - "Test veto with 0 tokens (should fail)"
+
+      - id: advanced-017
+        description: "Test tiebreaker scenarios"
+        agent: automation-developer
+        depends_on: [advanced-004]
+        acceptance_criteria:
+          - "Test tiebreaker triggers correctly"
+          - "Test first correct answer wins"
+          - "Test multiple tiebreaker rounds if needed"
+
+      - id: advanced-018
+        description: "Performance optimization (bundle size, WebSocket batching)"
+        agent: frontend-engineer
+        depends_on: [advanced-015]
+        acceptance_criteria:
+          - "Host bundle under 200KB gzipped"
+          - "Player bundle under 150KB gzipped"
+          - "WebSocket messages batched when possible"
+
+      - id: advanced-019
+        description: "Cross-browser testing"
+        agent: automation-developer
+        depends_on: [advanced-018]
+        acceptance_criteria:
+          - "Chrome, Safari, Firefox, Edge tested"
+          - "No console errors in any browser"
+          - "All features work identically"
+
+      - id: advanced-020
+        description: "Mobile device testing"
+        agent: automation-developer
+        depends_on: [advanced-018]
+        acceptance_criteria:
+          - "iOS Safari tested on real device"
+          - "Android Chrome tested on real device"
+          - "Touch interactions work correctly"
+
+      - id: advanced-021
+        description: "Accessibility review (contrast, text size, touch targets)"
+        agent: frontend-engineer
+        depends_on: [advanced-018]
+        acceptance_criteria:
+          - "WCAG AA contrast ratios met"
+          - "All text readable at specified distances"
+          - "Touch targets minimum 44x44px"
