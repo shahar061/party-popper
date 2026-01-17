@@ -11,6 +11,7 @@ export default defineConfig({
   },
   server: {
     port: 3001,
+    host: '0.0.0.0', // Allow access from network devices
   },
   build: {
     outDir: 'dist',
