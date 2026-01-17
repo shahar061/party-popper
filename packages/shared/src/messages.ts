@@ -63,6 +63,7 @@ export interface SubmitAnswerMessage {
     artist: string;
     title: string;
     year: number;
+    submittedBy: string;
   };
 }
 
@@ -109,6 +110,7 @@ export type ServerMessage =
   | PlayerReconnectedMessage
   | TeamChangedMessage
   | SettingsUpdatedMessage
+  | GameStartedMessage
   | RoundStartedMessage
   | TypingUpdateMessage
   | AnswerSubmittedMessage
@@ -162,6 +164,11 @@ export interface SettingsUpdatedMessage {
   payload: {
     settings: GameSettings;
   };
+}
+
+export interface GameStartedMessage {
+  type: 'game_started';
+  payload: Record<string, never>;
 }
 
 export interface RoundStartedMessage {

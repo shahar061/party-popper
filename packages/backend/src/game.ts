@@ -669,16 +669,72 @@ export class Game extends DurableObject {
         case 'start_game':
           const transitionResult = await this.transitionTo('playing');
           if (transitionResult.success) {
-            // Broadcast that game started
-            this.broadcast({ type: 'game_started', payload: {} });
-
-            // Also broadcast updated state so all clients get the new status
-            this.broadcast({
-              type: 'state_sync',
-              payload: { gameState: this.state }
-            });
+            // Start first round
+            const roundResult = await this.startRound();
+            if (roundResult.success) {
+              // Broadcast game started and new state with first round
+              this.broadcast({ type: 'game_started', payload: {} });
+              this.broadcast({
+                type: 'state_sync',
+                payload: { gameState: this.state }
+              });
+            } else {
+              this.sendToWs(ws, { type: 'error', payload: { message: roundResult.error } });
+            }
           } else {
             this.sendToWs(ws, { type: 'error', payload: { message: transitionResult.error } });
+          }
+          break;
+
+        case 'submit_answer':
+          if (payload && payload.artist && payload.title && payload.year !== undefined && payload.submittedBy) {
+            const answer: Answer = {
+              artist: payload.artist,
+              title: payload.title,
+              year: payload.year,
+              submittedBy: payload.submittedBy,
+              submittedAt: Date.now(),
+            };
+
+            const submitResult = await this.submitAnswer(answer);
+            if (submitResult.success) {
+              // Broadcast updated state with answer and reveal phase
+              this.broadcast({
+                type: 'state_sync',
+                payload: { gameState: this.state }
+              });
+            } else {
+              this.sendToWs(ws, { type: 'error', payload: { message: submitResult.error } });
+            }
+          } else {
+            this.sendToWs(ws, { type: 'error', payload: { message: 'Invalid answer format' } });
+          }
+          break;
+
+        case 'next_round':
+          // Complete current round
+          const completeResult = await this.completeRound();
+          if (completeResult.success) {
+            if (completeResult.gameFinished) {
+              // Game is finished
+              this.broadcast({
+                type: 'state_sync',
+                payload: { gameState: this.state }
+              });
+            } else {
+              // Start next round
+              const nextRoundResult = await this.startRound();
+              if (nextRoundResult.success) {
+                this.broadcast({
+                  type: 'state_sync',
+                  payload: { gameState: this.state }
+                });
+              } else {
+                this.sendToWs(ws, { type: 'error', payload: { message: nextRoundResult.error } });
+              }
+            }
+          } else {
+            this.sendToWs(ws, { type: 'error', payload: { message: completeResult.error } });
           }
           break;
 
