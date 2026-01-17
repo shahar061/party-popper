@@ -1,13 +1,13 @@
 import { DurableObject } from 'cloudflare:workers';
 
-export interface Env {
+export interface GameEnv {
   GAME: DurableObjectNamespace;
 }
 
-export class GameDO extends DurableObject {
-  private connections: Set<WebSocket> = new Set();
+export class Game extends DurableObject {
+  private connections: Map<WebSocket, { playerId?: string }> = new Map();
 
-  constructor(ctx: DurableObjectState, env: Env) {
+  constructor(ctx: DurableObjectState, env: GameEnv) {
     super(ctx, env);
   }
 
@@ -15,12 +15,16 @@ export class GameDO extends DurableObject {
     const url = new URL(request.url);
 
     // WebSocket upgrade
-    if (request.headers.get('Upgrade') === 'websocket') {
+    if (url.pathname === '/ws' || request.headers.get('Upgrade') === 'websocket') {
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return new Response('Expected WebSocket', { status: 426 });
+      }
+
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
       this.ctx.acceptWebSocket(server);
-      this.connections.add(server);
+      this.connections.set(server, {});
 
       return new Response(null, {
         status: 101,
@@ -50,7 +54,7 @@ export class GameDO extends DurableObject {
     ws.send(JSON.stringify({ type: 'echo', data }));
   }
 
-  async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void> {
+  async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
     this.connections.delete(ws);
     console.log(`WebSocket closed: ${code} ${reason}`);
   }

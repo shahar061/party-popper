@@ -1,4 +1,4 @@
-import { GameDO } from './game';
+import { Game } from './game';
 
 export interface Env {
   GAME: DurableObjectNamespace;
@@ -6,7 +6,7 @@ export interface Env {
   ENVIRONMENT: string;
 }
 
-export { GameDO };
+export { Game };
 
 function getCorsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get('Origin') || '';
