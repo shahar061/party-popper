@@ -9,7 +9,11 @@ import type {
   PlayerJoinedMessage,
   PlayerLeftMessage,
   TeamChangedMessage,
+  SettingsUpdatedMessage,
   ReassignTeamMessage,
+  UpdateSettingsMessage,
+  StartGameMessage,
+  GameSettings,
 } from '@party-popper/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
@@ -22,7 +26,7 @@ function App() {
   const [wsUrl, setWsUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { game, syncState, addPlayer, removePlayer, movePlayer } = useGameStore();
+  const { game, syncState, addPlayer, removePlayer, movePlayer, updateSettings } = useGameStore();
 
   const handleMessage = useCallback(
     (message: WebSocketMessage) => {
@@ -49,12 +53,17 @@ function App() {
           movePlayer(teamMsg.payload.playerId, teamMsg.payload.toTeam);
           break;
         }
+        case 'settings_updated': {
+          const settingsMsg = serverMsg as SettingsUpdatedMessage;
+          updateSettings(settingsMsg.payload.settings);
+          break;
+        }
         case 'error':
           setError(serverMsg.payload.message);
           break;
       }
     },
-    [syncState, addPlayer, removePlayer, movePlayer]
+    [syncState, addPlayer, removePlayer, movePlayer, updateSettings]
   );
 
   const { connectionState, send } = useGameConnection(wsUrl, {
@@ -116,6 +125,28 @@ function App() {
     [send, movePlayer]
   );
 
+  // Handler for updating game settings
+  const handleUpdateSettings = useCallback(
+    (settings: Partial<GameSettings>) => {
+      const message: UpdateSettingsMessage = {
+        type: 'update_settings',
+        payload: settings,
+      };
+      send(message);
+      // Optimistic update
+      updateSettings(settings);
+    },
+    [send, updateSettings]
+  );
+
+  // Handler for starting the game
+  const handleStartGame = useCallback(() => {
+    const message: StartGameMessage = {
+      type: 'start_game',
+    };
+    send(message);
+  }, [send]);
+
   // Loading state
   if (screen === 'loading') {
     return (
@@ -142,7 +173,10 @@ function App() {
           joinCode={game.joinCode}
           playerAppUrl={PLAYER_APP_URL}
           teams={game.teams}
+          settings={game.settings}
           onMovePlayer={handleMovePlayer}
+          onUpdateSettings={handleUpdateSettings}
+          onStartGame={handleStartGame}
         />
       </>
     );
