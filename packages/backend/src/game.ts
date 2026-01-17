@@ -18,6 +18,8 @@ const VALID_TRANSITIONS: Record<GameStatus, GameStatus[]> = {
   finished: [],
 };
 
+const PONG_TIMEOUT_MS = 10000; // 10 seconds
+
 function createEmptyTeam(name: string): Team {
   return {
     name,
@@ -31,6 +33,7 @@ function createEmptyTeam(name: string): Team {
 export class Game extends DurableObject {
   private connections: Map<WebSocket, { playerId?: string }> = new Map();
   private wsToPlayer: Map<WebSocket, string> = new Map(); // ws -> sessionId
+  private pendingPongs: Map<WebSocket, number> = new Map(); // ws -> ping sent timestamp
   private state: GameState | null = null;
 
   constructor(ctx: DurableObjectState, env: GameEnv) {
@@ -278,6 +281,50 @@ export class Game extends DurableObject {
       }
     } catch (error) {
       console.error('Failed to send message:', error);
+    }
+  }
+
+  // Heartbeat methods
+  async sendHeartbeat(): Promise<void> {
+    const pingMessage = JSON.stringify({ type: 'ping', payload: {} });
+
+    for (const [ws] of this.connections) {
+      if ((ws as any).readyState === 1) {
+        this.sendToWs(ws, pingMessage, pingMessage);
+        this.recordPingSent(ws);
+      }
+    }
+  }
+
+  recordPingSent(ws: WebSocket): void {
+    this.pendingPongs.set(ws, Date.now());
+  }
+
+  handlePong(ws: WebSocket): void {
+    this.pendingPongs.delete(ws);
+  }
+
+  isConnectionHealthy(ws: WebSocket): boolean {
+    const pingTime = this.pendingPongs.get(ws);
+    if (!pingTime) return true; // No pending ping
+
+    return Date.now() - pingTime < PONG_TIMEOUT_MS;
+  }
+
+  async checkPongTimeouts(): Promise<void> {
+    const now = Date.now();
+
+    for (const [ws, pingSentAt] of this.pendingPongs) {
+      if (now - pingSentAt > PONG_TIMEOUT_MS) {
+        // Close timed out connection
+        try {
+          (ws as any).close(1000, 'Ping timeout');
+        } catch {
+          // Connection may already be closed
+        }
+        this.pendingPongs.delete(ws);
+        await this.handleDisconnect(ws);
+      }
     }
   }
 
