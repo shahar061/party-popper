@@ -58,8 +58,13 @@ export function RoundDisplay({ round, teamName = 'Current Team' }: RoundDisplayP
       )}
 
       {!isRevealed && (
-        <div className="text-xl text-gray-400">
-          Scan to play the song!
+        <div className="text-center">
+          <div className="text-xl font-bold text-white mb-2">
+            Scan to open in Spotify
+          </div>
+          <div className="text-base text-gray-400">
+            (Then tap play to hear the song)
+          </div>
         </div>
       )}
     </div>
