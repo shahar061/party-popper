@@ -26,6 +26,8 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
       const joinCode = url.searchParams.get('code');
       const spotifyUrl = url.searchParams.get('spotify');
 
+      console.log('[QR Scan] Received scan for game:', joinCode);
+
       if (!joinCode || !spotifyUrl) {
         return new Response('Missing parameters', { status: 400 });
       }
@@ -35,6 +37,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
         const gameId = env.GAME.idFromName(joinCode);
         const gameStub = env.GAME.get(gameId);
 
+        console.log('[QR Scan] Notifying game instance:', joinCode);
         gameStub.fetch(new Request('https://internal/qr-scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -42,11 +45,14 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
             scannedAt: Date.now(),
             userAgent: request.headers.get('User-Agent')
           })
-        })).catch(console.error); // Don't block redirect on error
+        })).catch((error) => {
+          console.error('[QR Scan] Error notifying game:', error);
+        });
       } catch (error) {
-        console.error('Failed to notify game of scan:', error);
+        console.error('[QR Scan] Failed to notify game of scan:', error);
       }
 
+      console.log('[QR Scan] Redirecting to Spotify');
       // Redirect to Spotify
       return new Response(null, {
         status: 302,

@@ -585,6 +585,7 @@ export class Game extends DurableObject {
 
     // Internal: Track QR scan
     if (url.pathname === '/qr-scan' && request.method === 'POST') {
+      console.log('[Game] QR scan notification received');
       const body = await request.json() as { scannedAt: number; userAgent?: string };
 
       // Start the round timer if not already started
@@ -593,14 +594,23 @@ export class Game extends DurableObject {
         const roundDuration = this.state.settings.roundTimeSeconds * 1000;
         const currentEndsAt = this.state.currentRound.endsAt;
 
+        console.log('[Game] Current round timer endsAt:', new Date(currentEndsAt).toISOString());
+        console.log('[Game] Now + roundDuration * 2:', new Date(now + roundDuration * 2).toISOString());
+
         // Only update if timer hasn't been started yet (check if it's in the far future)
         if (currentEndsAt > now + roundDuration * 2) {
+          console.log('[Game] Starting timer! New endsAt:', new Date(now + roundDuration).toISOString());
           this.state.currentRound.endsAt = now + roundDuration;
           await this.persistState();
+        } else {
+          console.log('[Game] Timer already started, skipping update');
         }
+      } else {
+        console.log('[Game] No current round, cannot start timer');
       }
 
       // Broadcast scan detection to all clients
+      console.log('[Game] Broadcasting scan detection to', this.connections.size, 'clients');
       this.broadcast({
         type: 'qr_scan_detected',
         payload: {
