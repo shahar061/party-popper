@@ -28,6 +28,8 @@ export function RoundDisplay({ round, teamName = 'Current Team', gameCode }: Rou
   };
 
   const isRevealed = round.phase === 'reveal';
+  // Timer hasn't started yet if endsAt is more than 2x the round duration
+  const timerStarted = remainingTime < (round.endsAt - round.startedAt) / 2;
 
   return (
     <div className="flex flex-col items-center gap-6 p-8">
@@ -41,7 +43,7 @@ export function RoundDisplay({ round, teamName = 'Current Team', gameCode }: Rou
         data-testid="round-timer"
         className="text-6xl font-mono font-bold text-white"
       >
-        {formatTime(remainingTime)}
+        {timerStarted ? formatTime(remainingTime) : 'Waiting for scan...'}
       </div>
 
       {isRevealed && (
@@ -60,11 +62,8 @@ export function RoundDisplay({ round, teamName = 'Current Team', gameCode }: Rou
 
       {!isRevealed && (
         <div className="text-center">
-          <div className="text-xl font-bold text-white mb-2">
-            Scan to open in Spotify
-          </div>
-          <div className="text-base text-gray-400">
-            (Then tap play to hear the song)
+          <div className="text-xl font-bold text-white">
+            Scan the QR code to start the timer
           </div>
         </div>
       )}
