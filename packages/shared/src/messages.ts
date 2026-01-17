@@ -1,10 +1,27 @@
 import type { GameState, Player, Round, Answer, TypingState, RoundResult, GameSettings } from './types';
 
 /**
+ * Client -> Server message types
+ */
+export type ClientMessageType =
+  | 'join'
+  | 'leave'
+  | 'reconnect'
+  | 'start_game'
+  | 'submit_answer'
+  | 'use_veto'
+  | 'typing'
+  | 'next_round'
+  | 'reassign_team'
+  | 'update_settings'
+  | 'pong';
+
+/**
  * Client -> Server messages
  */
 export type ClientMessage =
   | JoinMessage
+  | LeaveMessage
   | ReconnectMessage
   | StartGameMessage
   | SubmitAnswerMessage
@@ -19,8 +36,14 @@ export interface JoinMessage {
   type: 'join';
   payload: {
     playerName: string;
+    sessionId: string;
     team?: 'A' | 'B';
   };
+}
+
+export interface LeaveMessage {
+  type: 'leave';
+  payload: Record<string, never>;
 }
 
 export interface ReconnectMessage {
@@ -206,6 +229,9 @@ export interface PingMessage {
 
 export type ErrorCode =
   | 'INVALID_MESSAGE'
+  | 'INVALID_JSON'
+  | 'UNKNOWN_MESSAGE_TYPE'
+  | 'HANDLER_ERROR'
   | 'NOT_AUTHORIZED'
   | 'GAME_NOT_FOUND'
   | 'GAME_FULL'
@@ -216,6 +242,11 @@ export type ErrorCode =
   | 'VETO_WINDOW_CLOSED'
   | 'RECONNECTION_EXPIRED'
   | 'PLAYER_NAME_TAKEN';
+
+export interface ErrorPayload {
+  code: string;
+  message: string;
+}
 
 /**
  * Type guard helpers
