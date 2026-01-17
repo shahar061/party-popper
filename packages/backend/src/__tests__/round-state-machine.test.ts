@@ -47,7 +47,7 @@ describe('RoundStateMachine', () => {
   });
 
   describe('phase transitions', () => {
-    it('should transition from guessing to reveal on submission', () => {
+    it('should transition from guessing to veto_window on submission', () => {
       machine.startRound(mockSong, 'A', 1, 60000);
 
       const round = machine.submitAnswer({
@@ -58,7 +58,7 @@ describe('RoundStateMachine', () => {
         submittedAt: Date.now()
       });
 
-      expect(round.phase).toBe('reveal');
+      expect(round.phase).toBe('veto_window');
     });
 
     it('should store the submitted answer', () => {
