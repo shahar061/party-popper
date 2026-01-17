@@ -1,2 +1,3 @@
-// Shared types and utilities - placeholder until setup-008
-export {};
+// Re-export all types
+export * from './types';
+export * from './messages';
