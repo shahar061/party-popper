@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Layout } from './components/Layout';
 import { JoinScreen } from './components/JoinScreen';
 import { LobbyView } from './components/LobbyView';
+import { PlayingView } from './components/PlayingView';
 import { ConnectionStatus } from './components/ConnectionStatus';
-import type { GameState, Player } from '@party-popper/shared';
+import type { GameState, Player, SubmitAnswerMessage } from '@party-popper/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
@@ -78,7 +79,20 @@ function App() {
                   sessionId: sessionIdRef.current,
                   gameCode: code,
                 });
-                setScreen('lobby');
+
+                // Set screen based on game status
+                switch (state.status) {
+                  case 'lobby':
+                    setScreen('lobby');
+                    break;
+                  case 'playing':
+                    setScreen('playing');
+                    break;
+                  case 'finished':
+                    setScreen('playing'); // Show playing screen with results
+                    break;
+                }
+
                 setIsLoading(false);
               }
               break;
@@ -156,6 +170,28 @@ function App() {
     }
   }, [screen]);
 
+  // Handler for submitting answer
+  const handleSubmitAnswer = useCallback((data: { artist: string; title: string; year: number }) => {
+    if (!wsRef.current || !playerState) return;
+
+    const message: SubmitAnswerMessage = {
+      type: 'submit_answer',
+      payload: {
+        artist: data.artist,
+        title: data.title,
+        year: data.year,
+        submittedBy: playerState.playerId,
+      },
+    };
+
+    wsRef.current.send(JSON.stringify(message));
+  }, [playerState]);
+
+  // Handler for typing (not used in minimal v1, but required by AnswerForm)
+  const handleTyping = useCallback((_field: string, _value: string) => {
+    // No-op for minimal v1 - typing state not synced
+  }, []);
+
   // Cleanup WebSocket on unmount
   useEffect(() => {
     return () => {
@@ -184,11 +220,13 @@ function App() {
         />
       )}
 
-      {screen === 'playing' && (
-        <div className="flex flex-col flex-1 items-center justify-center">
-          <h1 className="text-2xl font-bold text-white">Game in Progress</h1>
-          <p className="text-game-muted mt-2">Gameplay UI coming soon...</p>
-        </div>
+      {screen === 'playing' && gameState && playerState && (
+        <PlayingView
+          gameState={gameState}
+          playerId={playerState.playerId}
+          onSubmitAnswer={handleSubmitAnswer}
+          onTyping={handleTyping}
+        />
       )}
     </Layout>
   );
