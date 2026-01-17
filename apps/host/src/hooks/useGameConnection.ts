@@ -32,6 +32,18 @@ export function useGameConnection(
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Use refs for callbacks to avoid re-creating connect function
+  const onMessageRef = useRef(onMessage);
+  const onConnectRef = useRef(onConnect);
+  const onDisconnectRef = useRef(onDisconnect);
+
+  // Keep refs updated
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+    onConnectRef.current = onConnect;
+    onDisconnectRef.current = onDisconnect;
+  }, [onMessage, onConnect, onDisconnect]);
+
   const connect = useCallback(() => {
     if (!url) return;
 
@@ -42,12 +54,12 @@ export function useGameConnection(
     ws.onopen = () => {
       setConnectionState('connected');
       reconnectAttemptRef.current = 0;
-      onConnect?.();
+      onConnectRef.current?.();
     };
 
     ws.onclose = (event) => {
       setConnectionState('disconnected');
-      onDisconnect?.();
+      onDisconnectRef.current?.();
 
       // Don't reconnect on normal closure (code 1000) or if max attempts reached
       if (event.code !== 1000 && reconnectAttemptRef.current < maxReconnectAttempts) {
@@ -63,7 +75,7 @@ export function useGameConnection(
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data) as WebSocketMessage;
-        onMessage?.(message);
+        onMessageRef.current?.(message);
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);
       }
@@ -72,7 +84,7 @@ export function useGameConnection(
     ws.onerror = () => {
       // Error will be followed by close event
     };
-  }, [url, onMessage, onConnect, onDisconnect, maxReconnectAttempts]);
+  }, [url, maxReconnectAttempts]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {

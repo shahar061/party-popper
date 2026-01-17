@@ -462,8 +462,21 @@ export class Game extends DurableObject {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
-      this.ctx.acceptWebSocket(server);
+      // Tag the WebSocket with its role - tags survive hibernation
+      const role = url.searchParams.get('role');
+      const tags = role === 'host' ? ['host'] : ['player'];
+      this.ctx.acceptWebSocket(server, tags);
       this.connections.set(server, {});
+
+      // For host connections, send state_sync immediately
+      if (role === 'host' && this.state) {
+        server.send(JSON.stringify({
+          type: 'state_sync',
+          payload: {
+            gameState: this.state,
+          },
+        }));
+      }
 
       return new Response(null, {
         status: 101,
@@ -474,13 +487,84 @@ export class Game extends DurableObject {
     return new Response('Not Found', { status: 404 });
   }
 
-  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    // Message handling will be implemented in Phase 2
-    const data = typeof message === 'string' ? message : new TextDecoder().decode(message);
-    console.log('Received message:', data);
+  async webSocketOpen(ws: WebSocket): Promise<void> {
+    // Load state if not already loaded (can happen after hibernation wake-up)
+    if (!this.state) {
+      await this.loadState();
+    }
 
-    // Echo back for now (stub behavior)
-    ws.send(JSON.stringify({ type: 'echo', data }));
+    // Check if this is a host connection using WebSocket tags (survive hibernation)
+    const tags = this.ctx.getTags(ws);
+    const isHost = tags.includes('host');
+
+    // If this is a host connection, send state sync
+    // (Also sent in fetch handler, but this covers hibernation wake-up scenarios)
+    if (isHost && this.state) {
+      this.sendToWs(ws, {
+        type: 'state_sync',
+        payload: {
+          gameState: this.state,
+        },
+      });
+    }
+  }
+
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    const data = typeof message === 'string' ? message : new TextDecoder().decode(message);
+
+    try {
+      const parsed = JSON.parse(data);
+      const { type, payload } = parsed;
+
+      switch (type) {
+        case 'join':
+          await this.handleJoin(payload, ws);
+          break;
+
+        case 'reconnect':
+          const result = await this.handleReconnect(payload, ws);
+          this.sendToWs(ws, { type: 'reconnect_result', payload: result });
+          break;
+
+        case 'pong':
+          this.handlePong(ws);
+          break;
+
+        case 'reassign_team':
+          if (payload.playerId && payload.team) {
+            const reassignResult = await this.reassignTeam(payload.playerId, payload.team);
+            if (reassignResult.success) {
+              this.broadcast({ type: 'team_changed', payload: { playerId: payload.playerId, toTeam: payload.team } });
+            } else {
+              this.sendToWs(ws, { type: 'error', payload: { message: reassignResult.error } });
+            }
+          }
+          break;
+
+        case 'update_settings':
+          if (this.state && payload) {
+            this.state.settings = { ...this.state.settings, ...payload };
+            await this.persistState();
+            this.broadcast({ type: 'settings_updated', payload: { settings: this.state.settings } });
+          }
+          break;
+
+        case 'start_game':
+          const transitionResult = await this.transitionTo('playing');
+          if (transitionResult.success) {
+            this.broadcast({ type: 'game_started', payload: {} });
+          } else {
+            this.sendToWs(ws, { type: 'error', payload: { message: transitionResult.error } });
+          }
+          break;
+
+        default:
+          console.log('Unknown message type:', type);
+      }
+    } catch (error) {
+      console.error('Error processing message:', error);
+      this.sendToWs(ws, { type: 'error', payload: { message: 'Invalid message format' } });
+    }
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {

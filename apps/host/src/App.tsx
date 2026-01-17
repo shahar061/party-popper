@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameConnection, type WebSocketMessage } from './hooks/useGameConnection';
 import { useGameStore } from './store/gameStore';
 import { LobbyScreen } from './components/LobbyScreen';
@@ -75,13 +75,21 @@ function App() {
     onDisconnect: () => showError('Disconnected from server'),
   });
 
-  // Create game on mount
+  // Ref to ensure game is only created once (survives StrictMode double-mount)
+  const gameCreatedRef = useRef(false);
+
+  // Create game on mount (only once)
   useEffect(() => {
+    // Prevent double creation from StrictMode or HMR
+    if (gameCreatedRef.current) return;
+    gameCreatedRef.current = true;
+
     async function createGame() {
       try {
         const response = await fetch(`${API_URL}/api/games`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'classic' }),
         });
 
         if (!response.ok) {
@@ -89,14 +97,21 @@ function App() {
         }
 
         const data = await response.json();
-        setWsUrl(data.wsUrl);
+
+        // Construct WebSocket URL from joinCode
+        const wsProtocol = API_URL.startsWith('https') ? 'wss' : 'ws';
+        const wsHost = API_URL.replace(/^https?:\/\//, '');
+        setWsUrl(`${wsProtocol}://${wsHost}/api/games/${data.joinCode}/ws?role=host`);
       } catch (err) {
         showError(err instanceof Error ? err.message : 'Failed to create game');
+        // Allow retry on error
+        gameCreatedRef.current = false;
       }
     }
 
     createGame();
-  }, [showError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Update screen based on game status
   useEffect(() => {
