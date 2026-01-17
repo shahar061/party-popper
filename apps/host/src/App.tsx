@@ -3,6 +3,8 @@ import { useGameConnection, type WebSocketMessage } from './hooks/useGameConnect
 import { useGameStore } from './store/gameStore';
 import { LobbyScreen } from './components/LobbyScreen';
 import { ConnectionStatus } from './components/ConnectionStatus';
+import { ToastContainer, useToasts } from './components/Toast';
+import { TVLayout } from './components/TVLayout';
 import type {
   ServerMessage,
   StateSyncMessage,
@@ -24,8 +26,8 @@ type Screen = 'loading' | 'lobby' | 'playing' | 'finished';
 function App() {
   const [screen, setScreen] = useState<Screen>('loading');
   const [wsUrl, setWsUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
+  const { toasts, dismissToast, success, error: showError, info } = useToasts();
   const { game, syncState, addPlayer, removePlayer, movePlayer, updateSettings } = useGameStore();
 
   const handleMessage = useCallback(
@@ -41,6 +43,7 @@ function App() {
         case 'player_joined': {
           const joinMsg = serverMsg as PlayerJoinedMessage;
           addPlayer(joinMsg.payload.player, joinMsg.payload.player.team);
+          info(`${joinMsg.payload.player.name} joined!`);
           break;
         }
         case 'player_left': {
@@ -59,16 +62,17 @@ function App() {
           break;
         }
         case 'error':
-          setError(serverMsg.payload.message);
+          showError(serverMsg.payload.message);
           break;
       }
     },
-    [syncState, addPlayer, removePlayer, movePlayer, updateSettings]
+    [syncState, addPlayer, removePlayer, movePlayer, updateSettings, info, showError]
   );
 
   const { connectionState, send } = useGameConnection(wsUrl, {
     onMessage: handleMessage,
-    onConnect: () => setError(null),
+    onConnect: () => success('Connected to game server'),
+    onDisconnect: () => showError('Disconnected from server'),
   });
 
   // Create game on mount
@@ -87,12 +91,12 @@ function App() {
         const data = await response.json();
         setWsUrl(data.wsUrl);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to create game');
+        showError(err instanceof Error ? err.message : 'Failed to create game');
       }
     }
 
     createGame();
-  }, []);
+  }, [showError]);
 
   // Update screen based on game status
   useEffect(() => {
@@ -145,22 +149,27 @@ function App() {
       type: 'start_game',
     };
     send(message);
-  }, [send]);
+    info('Starting game...');
+  }, [send, info]);
 
   // Loading state
   if (screen === 'loading') {
     return (
-      <>
+      <TVLayout>
         <ConnectionStatus state={connectionState} />
-        <div className="min-h-screen flex items-center justify-center bg-game-bg">
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <h1 className="text-tv-xl font-bold text-game-text mb-4">Party Popper</h1>
-            <p className="text-tv-base text-game-muted">
-              {error || 'Creating game...'}
-            </p>
+            <h1 className="text-tv-2xl font-bold text-game-text mb-4">Party Popper</h1>
+            <p className="text-tv-base text-game-muted">Creating game...</p>
+            <div className="mt-8 flex justify-center gap-3">
+              <span className="w-4 h-4 bg-team-a-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <span className="w-4 h-4 bg-team-b-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <span className="w-4 h-4 bg-game-text rounded-full animate-bounce" />
+            </div>
           </div>
         </div>
-      </>
+      </TVLayout>
     );
   }
 
@@ -169,6 +178,7 @@ function App() {
     return (
       <>
         <ConnectionStatus state={connectionState} />
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         <LobbyScreen
           joinCode={game.joinCode}
           playerAppUrl={PLAYER_APP_URL}
@@ -184,15 +194,16 @@ function App() {
 
   // Placeholder for other screens
   return (
-    <>
+    <TVLayout>
       <ConnectionStatus state={connectionState} />
-      <div className="min-h-screen flex items-center justify-center bg-game-bg">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-tv-xl font-bold text-game-text mb-4">Party Popper</h1>
+          <h1 className="text-tv-2xl font-bold text-game-text mb-4">Party Popper</h1>
           <p className="text-tv-base text-game-muted">Screen: {screen}</p>
         </div>
       </div>
-    </>
+    </TVLayout>
   );
 }
 
