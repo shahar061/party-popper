@@ -352,7 +352,8 @@ export class Game extends DurableObject {
       activeTeam,
       phase: 'guessing',
       startedAt: now,
-      endsAt: now + roundDuration,
+      // Timer starts at a far future time - will be updated when QR code is scanned
+      endsAt: now + (365 * 24 * 60 * 60 * 1000), // 1 year in the future (effectively no countdown)
       currentAnswer: null,
     };
 
@@ -585,6 +586,19 @@ export class Game extends DurableObject {
     // Internal: Track QR scan
     if (url.pathname === '/qr-scan' && request.method === 'POST') {
       const body = await request.json() as { scannedAt: number; userAgent?: string };
+
+      // Start the round timer if not already started
+      if (this.state && this.state.currentRound) {
+        const now = Date.now();
+        const roundDuration = this.state.settings.roundTimeSeconds * 1000;
+        const currentEndsAt = this.state.currentRound.endsAt;
+
+        // Only update if timer hasn't been started yet (check if it's in the far future)
+        if (currentEndsAt > now + roundDuration * 2) {
+          this.state.currentRound.endsAt = now + roundDuration;
+          await this.persistState();
+        }
+      }
 
       // Broadcast scan detection to all clients
       this.broadcast({

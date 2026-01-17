@@ -143,7 +143,7 @@ function App() {
             }
             case 'qr_scan_detected': {
               setScanDetected(true);
-              // Auto-ready after 2 seconds if manual confirmation not received
+              // Auto-ready after 2 seconds - timer has started!
               autoReadyTimeoutRef.current = setTimeout(() => {
                 handleReady();
               }, 2000);
