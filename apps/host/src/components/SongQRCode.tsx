@@ -6,12 +6,12 @@ interface SongQRCodeProps {
 }
 
 export function SongQRCode({ spotifyUri, size = 200 }: SongQRCodeProps) {
-  // Convert Spotify URI to URL for mobile compatibility
-  // URI format: spotify:track:xxxxx
-  // URL format: https://open.spotify.com/track/xxxxx
-  const spotifyUrl = spotifyUri.startsWith('spotify:')
-    ? spotifyUri.replace('spotify:', 'https://open.spotify.com/').replace(/:/g, '/')
-    : spotifyUri;
+  // Extract track ID from URI (spotify:track:xxxxx)
+  const trackId = spotifyUri.split(':')[2];
+
+  // Use open.spotify.com URL which automatically redirects to app if installed
+  // Adding ?go=1 parameter triggers automatic app opening on mobile
+  const spotifyUrl = `https://open.spotify.com/track/${trackId}?go=1`;
 
   return (
     <div data-testid="song-qr-code" className="bg-white p-4 rounded-lg inline-block">
