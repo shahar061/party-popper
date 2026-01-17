@@ -66,11 +66,11 @@ export interface Round {
   startedAt: number;
   endsAt: number;
   currentAnswer: Answer | null;
-  typingState: TypingState | null;
-  vetoChallenge: VetoChallenge | null;
+  typingState?: TypingState | null; // Not used in v1 minimal gameplay
+  vetoChallenge?: VetoChallenge | null; // Not used in v1 minimal gameplay
 }
 
-export type RoundPhase = 'guessing' | 'veto_window' | 'reveal';
+export type RoundPhase = 'guessing' | 'reveal' | 'waiting';
 
 export interface Answer {
   artist: string;
