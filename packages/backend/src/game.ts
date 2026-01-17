@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { GameState, GameStatus, GameMode, Team, Player } from '@party-popper/shared';
+import type { GameState, GameStatus, GameMode, Team, Player, Song } from '@party-popper/shared';
 import { DEFAULT_SETTINGS, GAME_CONSTANTS } from '@party-popper/shared';
+import songsData from '../data/songs.json';
 
 interface JoinPayload {
   playerName: string;
@@ -31,6 +32,16 @@ function createEmptyTeam(name: string): Team {
   };
 }
 
+// Fisher-Yates shuffle
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 export class Game extends DurableObject {
   private connections: Map<WebSocket, { playerId?: string }> = new Map();
   private wsToPlayer: Map<WebSocket, string> = new Map(); // ws -> sessionId
@@ -42,6 +53,11 @@ export class Game extends DurableObject {
   }
 
   async initialize(joinCode: string, mode: GameMode): Promise<void> {
+    // Load and shuffle songs for Classic mode
+    const songPool: Song[] = mode === 'classic'
+      ? shuffleArray((songsData as { songs: Song[] }).songs)
+      : [];
+
     this.state = {
       id: crypto.randomUUID(),
       joinCode,
@@ -53,7 +69,7 @@ export class Game extends DurableObject {
         B: createEmptyTeam('Team B'),
       },
       currentRound: null,
-      songPool: [],
+      songPool,
       playedSongs: [],
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
@@ -365,6 +381,27 @@ export class Game extends DurableObject {
         await this.handleDisconnect(ws);
       }
     }
+  }
+
+  // Song pool methods
+  async getNextSong(): Promise<Song | null> {
+    if (!this.state || this.state.songPool.length === 0) {
+      return null;
+    }
+
+    // Take first song from pool
+    const song = this.state.songPool.shift()!;
+
+    // Add to played songs
+    this.state.playedSongs.push(song);
+
+    await this.persistState();
+
+    return song;
+  }
+
+  hasSongsAvailable(): boolean {
+    return this.state !== null && this.state.songPool.length > 0;
   }
 
   private async persistState(): Promise<void> {
