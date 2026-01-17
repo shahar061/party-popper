@@ -24,6 +24,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [playerState, setPlayerState] = useState<PlayerState | null>(null);
+  const [scanDetected, setScanDetected] = useState(false);
+  const autoReadyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string>(
@@ -139,6 +141,14 @@ function App() {
               setScreen('playing');
               break;
             }
+            case 'qr_scan_detected': {
+              setScanDetected(true);
+              // Auto-ready after 2 seconds if manual confirmation not received
+              autoReadyTimeoutRef.current = setTimeout(() => {
+                handleReady();
+              }, 2000);
+              break;
+            }
             case 'error': {
               setError(message.payload.message);
               setIsLoading(false);
@@ -196,6 +206,12 @@ function App() {
   const handleReady = useCallback(() => {
     if (!wsRef.current || !playerState) return;
 
+    // Clear auto-ready timeout if it exists
+    if (autoReadyTimeoutRef.current) {
+      clearTimeout(autoReadyTimeoutRef.current);
+      autoReadyTimeoutRef.current = null;
+    }
+
     const message: PlayerReadyMessage = {
       type: 'player_ready',
       payload: {
@@ -204,12 +220,16 @@ function App() {
     };
 
     wsRef.current.send(JSON.stringify(message));
+    setScanDetected(false); // Reset scan detection state
   }, [playerState]);
 
-  // Cleanup WebSocket on unmount
+  // Cleanup WebSocket and timeout on unmount
   useEffect(() => {
     return () => {
       wsRef.current?.close(1000);
+      if (autoReadyTimeoutRef.current) {
+        clearTimeout(autoReadyTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -241,6 +261,7 @@ function App() {
           onSubmitAnswer={handleSubmitAnswer}
           onTyping={handleTyping}
           onReady={handleReady}
+          scanDetected={scanDetected}
         />
       )}
     </Layout>

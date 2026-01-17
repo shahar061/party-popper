@@ -45,6 +45,7 @@ export function GameplayScreen({ game, onNextRound }: GameplayScreenProps) {
         <RoundDisplay
           round={currentRound}
           teamName={activeTeam.name}
+          gameCode={game.joinCode}
         />
 
         {/* Answer Display (only show in reveal or waiting phase) */}

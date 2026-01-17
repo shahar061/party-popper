@@ -21,6 +21,42 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   }
 
   try {
+    // GET /qr/track - QR code redirect with tracking
+    if (path === '/qr/track' && request.method === 'GET') {
+      const joinCode = url.searchParams.get('code');
+      const spotifyUrl = url.searchParams.get('spotify');
+
+      if (!joinCode || !spotifyUrl) {
+        return new Response('Missing parameters', { status: 400 });
+      }
+
+      // Notify game instance of scan (fire and forget)
+      try {
+        const gameId = env.GAME.idFromName(joinCode);
+        const gameStub = env.GAME.get(gameId);
+
+        gameStub.fetch(new Request('https://internal/qr-scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scannedAt: Date.now(),
+            userAgent: request.headers.get('User-Agent')
+          })
+        })).catch(console.error); // Don't block redirect on error
+      } catch (error) {
+        console.error('Failed to notify game of scan:', error);
+      }
+
+      // Redirect to Spotify
+      return new Response(null, {
+        status: 302,
+        headers: {
+          'Location': decodeURIComponent(spotifyUrl),
+          'Cache-Control': 'no-cache'
+        }
+      });
+    }
+
     // POST /api/games - Create new game
     if (path === '/api/games' && request.method === 'POST') {
       const body = await request.json() as { mode?: 'classic' | 'custom' };
@@ -51,12 +87,12 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
       );
     }
 
-    // GET /api/games/:code - Get game info
-    const gameInfoMatch = path.match(/^\/api\/games\/([A-Z0-9]{4})$/);
-    if (gameInfoMatch && request.method === 'GET') {
-      const joinCode = gameInfoMatch[1];
+    // GET /api/games/:code/ws - WebSocket connection
+    const wsMatch = path.match(/^\/api\/games\/([A-Z0-9]{4})\/ws$/);
+    if (wsMatch && request.headers.get('Upgrade') === 'websocket') {
+      const joinCode = wsMatch[1];
 
-      // Look up game ID from code
+      // Verify game exists in KV
       const gameIdStr = await env.GAME_CODES.get(joinCode);
       if (!gameIdStr) {
         return new Response(
@@ -65,8 +101,29 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
         );
       }
 
-      // Get game info from Durable Object
-      const gameId = env.GAME.idFromString(gameIdStr);
+      // IMPORTANT: Use idFromName to get the SAME Durable Object instance
+      // that was created during game creation
+      const gameId = env.GAME.idFromName(joinCode);
+      const gameStub = env.GAME.get(gameId);
+      return gameStub.fetch(request);
+    }
+
+    // GET /api/games/:code - Get game info
+    const gameInfoMatch = path.match(/^\/api\/games\/([A-Z0-9]{4})$/);
+    if (gameInfoMatch && request.method === 'GET') {
+      const joinCode = gameInfoMatch[1];
+
+      // Verify game exists in KV
+      const gameIdStr = await env.GAME_CODES.get(joinCode);
+      if (!gameIdStr) {
+        return new Response(
+          JSON.stringify({ error: 'Game not found' }),
+          { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      }
+
+      // IMPORTANT: Use idFromName to get the SAME Durable Object instance
+      const gameId = env.GAME.idFromName(joinCode);
       const gameStub = env.GAME.get(gameId);
 
       const response = await gameStub.fetch(new Request('https://internal/info'));

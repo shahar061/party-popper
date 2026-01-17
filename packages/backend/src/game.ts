@@ -582,6 +582,24 @@ export class Game extends DurableObject {
       });
     }
 
+    // Internal: Track QR scan
+    if (url.pathname === '/qr-scan' && request.method === 'POST') {
+      const body = await request.json() as { scannedAt: number; userAgent?: string };
+
+      // Broadcast scan detection to all clients
+      this.broadcast({
+        type: 'qr_scan_detected',
+        payload: {
+          scannedAt: body.scannedAt,
+          userAgent: body.userAgent
+        }
+      });
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // WebSocket upgrade
     if (url.pathname === '/ws' || request.headers.get('Upgrade') === 'websocket') {
       if (request.headers.get('Upgrade') !== 'websocket') {

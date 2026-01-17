@@ -5,9 +5,10 @@ import { SongQRCode } from './SongQRCode';
 interface RoundDisplayProps {
   round: Round;
   teamName?: string;
+  gameCode: string;
 }
 
-export function RoundDisplay({ round, teamName = 'Current Team' }: RoundDisplayProps) {
+export function RoundDisplay({ round, teamName = 'Current Team', gameCode }: RoundDisplayProps) {
   const [remainingTime, setRemainingTime] = useState<number>(0);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export function RoundDisplay({ round, teamName = 'Current Team' }: RoundDisplayP
         {teamName}'s Turn
       </div>
 
-      <SongQRCode spotifyUri={round.song.spotifyUri} size={250} />
+      <SongQRCode spotifyUri={round.song.spotifyUri} gameCode={gameCode} size={250} />
 
       <div
         data-testid="round-timer"

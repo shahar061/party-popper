@@ -10,6 +10,7 @@ interface PlayingViewProps {
   onSubmitAnswer: (data: { artist: string; title: string; year: number }) => void;
   onTyping: (field: string, value: string) => void;
   onReady: () => void;
+  scanDetected: boolean;
 }
 
 export function PlayingView({
@@ -18,6 +19,7 @@ export function PlayingView({
   onSubmitAnswer,
   onTyping,
   onReady,
+  scanDetected,
 }: PlayingViewProps) {
   const { currentRound, teams } = gameState;
   const [confirmed, setConfirmed] = useState(false);
@@ -65,21 +67,29 @@ export function PlayingView({
             {/* Ready Button - Show before answer form if not confirmed */}
             {!confirmed && (
               <div className="text-center space-y-6 mb-6">
-                <div className="text-xl text-white">
-                  Scan the QR code on the TV to hear the song!
-                </div>
-                <button
-                  onClick={() => {
-                    onReady();
-                    setConfirmed(true);
-                  }}
-                  className="px-8 py-4 bg-green-500 hover:bg-green-600 text-white text-xl font-bold rounded-lg transition-colors"
-                >
-                  Ready! I'm Listening
-                </button>
-                <div className="text-sm text-gray-400">
-                  (Tap when you've scanned and started the song)
-                </div>
+                {scanDetected ? (
+                  <div className="text-xl text-green-400 font-semibold animate-pulse">
+                    Scan detected! Starting soon...
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-xl text-white">
+                      Scan the QR code on the TV to hear the song!
+                    </div>
+                    <button
+                      onClick={() => {
+                        onReady();
+                        setConfirmed(true);
+                      }}
+                      className="px-8 py-4 bg-green-500 hover:bg-green-600 text-white text-xl font-bold rounded-lg transition-colors"
+                    >
+                      Ready! I'm Listening
+                    </button>
+                    <div className="text-sm text-gray-400">
+                      (Tap when you've scanned and started the song)
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

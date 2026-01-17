@@ -36,20 +36,20 @@ describe('RoundDisplay', () => {
   });
 
   it('should render QR code with Spotify deeplink', () => {
-    render(<RoundDisplay round={mockRound} />);
+    render(<RoundDisplay round={mockRound} gameCode="TEST" />);
 
     const qrCode = screen.getByTestId('song-qr-code');
     expect(qrCode).toBeInTheDocument();
   });
 
   it('should show timer countdown', () => {
-    render(<RoundDisplay round={mockRound} />);
+    render(<RoundDisplay round={mockRound} gameCode="TEST" />);
 
     expect(screen.getByTestId('round-timer')).toBeInTheDocument();
   });
 
   it('should hide song details during guessing phase', () => {
-    render(<RoundDisplay round={mockRound} />);
+    render(<RoundDisplay round={mockRound} gameCode="TEST" />);
 
     expect(screen.queryByText('Hidden Song')).not.toBeInTheDocument();
     expect(screen.queryByText('Hidden Artist')).not.toBeInTheDocument();
@@ -57,7 +57,7 @@ describe('RoundDisplay', () => {
 
   it('should show song details during reveal phase', () => {
     const revealRound: Round = { ...mockRound, phase: 'reveal' };
-    render(<RoundDisplay round={revealRound} />);
+    render(<RoundDisplay round={revealRound} gameCode="TEST" />);
 
     expect(screen.getByText('Hidden Song')).toBeInTheDocument();
     expect(screen.getByText('Hidden Artist')).toBeInTheDocument();
@@ -65,13 +65,13 @@ describe('RoundDisplay', () => {
   });
 
   it('should display active team name', () => {
-    render(<RoundDisplay round={mockRound} teamName="Team Alpha" />);
+    render(<RoundDisplay round={mockRound} teamName="Team Alpha" gameCode="TEST" />);
 
     expect(screen.getByText(/Team Alpha/)).toBeInTheDocument();
   });
 
   it('should format timer correctly', () => {
-    render(<RoundDisplay round={mockRound} />);
+    render(<RoundDisplay round={mockRound} gameCode="TEST" />);
 
     // Timer should show 1:00 initially
     expect(screen.getByTestId('round-timer')).toHaveTextContent('1:00');

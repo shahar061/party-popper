@@ -118,6 +118,7 @@ export type ServerMessage =
   | PlayerLeftMessage
   | PlayerReconnectedMessage
   | PlayerReadyNotificationMessage
+  | QRScanDetectedMessage
   | TeamChangedMessage
   | SettingsUpdatedMessage
   | GameStartedMessage
@@ -166,6 +167,14 @@ export interface PlayerReadyNotificationMessage {
     playerId: string;
     playerName: string;
     readyAt: number;
+  };
+}
+
+export interface QRScanDetectedMessage {
+  type: 'qr_scan_detected';
+  payload: {
+    scannedAt: number;
+    userAgent?: string;
   };
 }
 
