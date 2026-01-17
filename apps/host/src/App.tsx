@@ -1,8 +1,10 @@
 function App() {
   return (
-    <div>
-      <h1>Party Popper - Host Display</h1>
-      <p>Host application is running.</p>
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-tv-xl font-bold mb-4">Party Popper</h1>
+        <p className="text-tv-base text-game-muted">Host Display</p>
+      </div>
     </div>
   );
 }
