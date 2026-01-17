@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { GameState, GameStatus, GameMode, Team, Player } from '@party-popper/shared';
-import { DEFAULT_SETTINGS } from '@party-popper/shared';
+import { DEFAULT_SETTINGS, GAME_CONSTANTS } from '@party-popper/shared';
 
 interface JoinPayload {
   playerName: string;
@@ -113,8 +113,17 @@ export class Game extends DurableObject {
       lastSeen: Date.now(),
     };
 
-    // Assign to team
-    const targetTeam = player.team;
+    // Assign to team (check capacity)
+    let targetTeam = player.team;
+    if (this.state.teams[targetTeam].players.length >= GAME_CONSTANTS.MAX_PLAYERS_PER_TEAM) {
+      // Team full, try other team
+      const otherTeam = targetTeam === 'A' ? 'B' : 'A';
+      if (this.state.teams[otherTeam].players.length < GAME_CONSTANTS.MAX_PLAYERS_PER_TEAM) {
+        targetTeam = otherTeam;
+        player.team = targetTeam;
+      }
+      // If both full, player still gets added (graceful degradation)
+    }
     this.state.teams[targetTeam].players.push(player);
 
     // Track connection
@@ -172,6 +181,53 @@ export class Game extends DurableObject {
       if (player) return player;
     }
     return undefined;
+  }
+
+  findPlayerById(playerId: string): Player | undefined {
+    if (!this.state) return undefined;
+
+    for (const teamKey of ['A', 'B'] as const) {
+      const player = this.state.teams[teamKey].players.find(p => p.id === playerId);
+      if (player) return player;
+    }
+    return undefined;
+  }
+
+  async reassignTeam(playerId: string, newTeam: 'A' | 'B'): Promise<{ success: boolean; error?: string }> {
+    if (!this.state) {
+      return { success: false, error: 'Game not initialized' };
+    }
+
+    // Find and remove player from current team
+    let player: Player | undefined;
+    for (const teamKey of ['A', 'B'] as const) {
+      const team = this.state.teams[teamKey];
+      const index = team.players.findIndex(p => p.id === playerId);
+      if (index !== -1) {
+        player = team.players[index];
+        team.players.splice(index, 1);
+        break;
+      }
+    }
+
+    if (!player) {
+      return { success: false, error: 'Player not found' };
+    }
+
+    // Check if target team has capacity
+    if (this.state.teams[newTeam].players.length >= GAME_CONSTANTS.MAX_PLAYERS_PER_TEAM) {
+      // Put player back
+      this.state.teams[player.team].players.push(player);
+      return { success: false, error: 'Target team is full' };
+    }
+
+    // Add to new team
+    player.team = newTeam;
+    this.state.teams[newTeam].players.push(player);
+    this.state.lastActivityAt = Date.now();
+    await this.persistState();
+
+    return { success: true };
   }
 
   private getTeamWithFewerPlayers(): 'A' | 'B' {
