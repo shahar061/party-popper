@@ -2,21 +2,34 @@ import { GameDO } from './game';
 
 export interface Env {
   GAME: DurableObjectNamespace;
+  ALLOWED_ORIGINS: string;
+  ENVIRONMENT: string;
 }
 
 export { GameDO };
+
+function getCorsHeaders(request: Request, env: Env): Record<string, string> {
+  const origin = request.headers.get('Origin') || '';
+  const allowedOrigins = env.ALLOWED_ORIGINS?.split(',') || [];
+
+  // In development, allow all origins
+  if (env.ENVIRONMENT === 'development' || allowedOrigins.includes(origin)) {
+    return {
+      'Access-Control-Allow-Origin': origin || '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Credentials': 'true',
+    };
+  }
+
+  return {};
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
-
-    // CORS headers for development
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    };
+    const corsHeaders = getCorsHeaders(request, env);
 
     // Handle preflight
     if (request.method === 'OPTIONS') {
@@ -25,7 +38,7 @@ export default {
 
     // Health check
     if (path === '/api/health') {
-      return new Response(JSON.stringify({ status: 'ok' }), {
+      return new Response(JSON.stringify({ status: 'ok', environment: env.ENVIRONMENT }), {
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }

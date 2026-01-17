@@ -14,3 +14,12 @@ new_classes = ["GameDO"]
 [dev]
 port = 8787
 local_protocol = "http"
+ip = "0.0.0.0"
+
+# Environment variables
+[vars]
+ENVIRONMENT = "development"
+
+# CORS origins for local development
+# In production, these would be the actual Cloudflare Pages URLs
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001"
