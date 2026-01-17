@@ -1,7 +1,7 @@
 import { Game } from './game';
+import { handleRequest, Env as RouterEnv } from './router';
 
-export interface Env {
-  GAME: DurableObjectNamespace;
+export interface Env extends RouterEnv {
   ALLOWED_ORIGINS: string;
   ENVIRONMENT: string;
 }
@@ -43,12 +43,9 @@ export default {
       });
     }
 
-    // Game routes will be added in Phase 2
+    // Game routes - delegate to router
     if (path.startsWith('/api/games')) {
-      return new Response(JSON.stringify({ message: 'Games API coming soon' }), {
-        status: 501,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      return handleRequest(request, env);
     }
 
     return new Response('Not Found', { status: 404, headers: corsHeaders });

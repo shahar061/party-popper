@@ -11,6 +11,12 @@ bindings = [
 tag = "v1"
 new_classes = ["Game"]
 
+# KV namespace for join code -> game ID mapping
+[[kv_namespaces]]
+binding = "GAME_CODES"
+id = "PLACEHOLDER_KV_ID"
+preview_id = "PLACEHOLDER_PREVIEW_KV_ID"
+
 [dev]
 port = 8787
 local_protocol = "http"

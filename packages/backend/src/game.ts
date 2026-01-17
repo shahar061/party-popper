@@ -98,6 +98,34 @@ export class Game extends DurableObject {
 
     const url = new URL(request.url);
 
+    // Internal: Initialize game
+    if (url.pathname === '/initialize' && request.method === 'POST') {
+      const body = await request.json() as { joinCode: string; mode: 'classic' | 'custom' };
+      await this.initialize(body.joinCode, body.mode);
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Internal: Get game info
+    if (url.pathname === '/info' && request.method === 'GET') {
+      if (!this.state) {
+        return new Response(JSON.stringify({ error: 'Game not found' }), { status: 404 });
+      }
+      return new Response(JSON.stringify({
+        joinCode: this.state.joinCode,
+        status: this.state.status,
+        mode: this.state.mode,
+        playerCount: this.state.teams.A.players.length + this.state.teams.B.players.length,
+        teams: {
+          A: { name: this.state.teams.A.name, playerCount: this.state.teams.A.players.length },
+          B: { name: this.state.teams.B.name, playerCount: this.state.teams.B.players.length },
+        },
+      }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // WebSocket upgrade
     if (url.pathname === '/ws' || request.headers.get('Upgrade') === 'websocket') {
       if (request.headers.get('Upgrade') !== 'websocket') {
@@ -113,16 +141,6 @@ export class Game extends DurableObject {
       return new Response(null, {
         status: 101,
         webSocket: client,
-      });
-    }
-
-    // HTTP endpoints for game info
-    if (url.pathname === '/info') {
-      return new Response(JSON.stringify({
-        connections: this.connections.size,
-        status: 'stub',
-      }), {
-        headers: { 'Content-Type': 'application/json' },
       });
     }
 
