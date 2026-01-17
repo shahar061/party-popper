@@ -19,6 +19,7 @@ const VALID_TRANSITIONS: Record<GameStatus, GameStatus[]> = {
 };
 
 const PONG_TIMEOUT_MS = 10000; // 10 seconds
+const RECONNECT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
 function createEmptyTeam(name: string): Team {
   return {
@@ -180,6 +181,44 @@ export class Game extends DurableObject {
     this.wsToPlayer.delete(ws);
     this.connections.delete(ws);
     await this.persistState();
+  }
+
+  async handleReconnect(
+    payload: { sessionId: string },
+    ws: WebSocket
+  ): Promise<{ success: boolean; playerName?: string; error?: string }> {
+    if (!this.state) {
+      return { success: false, error: 'Game not initialized' };
+    }
+
+    const { sessionId } = payload;
+
+    // Find player by session
+    const player = this.findPlayerBySession(sessionId);
+
+    if (!player) {
+      return { success: false, error: 'Session not found' };
+    }
+
+    // Check if within reconnection window
+    const timeSinceLastSeen = Date.now() - player.lastSeen;
+    if (timeSinceLastSeen > RECONNECT_WINDOW_MS) {
+      return { success: false, error: 'Reconnection window expired' };
+    }
+
+    // Restore connection
+    player.connected = true;
+    player.lastSeen = Date.now();
+
+    this.wsToPlayer.set(ws, sessionId);
+    this.connections.set(ws, { playerId: player.id });
+
+    await this.persistState();
+
+    // Send full state sync
+    this.sendStateSync(ws, player);
+
+    return { success: true, playerName: player.name };
   }
 
   findPlayerBySession(sessionId: string): Player | undefined {
