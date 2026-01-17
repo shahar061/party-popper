@@ -1,6 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { GameState, GameStatus, GameMode, Team } from '@party-popper/shared';
+import type { GameState, GameStatus, GameMode, Team, Player } from '@party-popper/shared';
 import { DEFAULT_SETTINGS } from '@party-popper/shared';
+
+interface JoinPayload {
+  playerName: string;
+  sessionId: string;
+  team?: 'A' | 'B';
+}
 
 export interface GameEnv {
   GAME: DurableObjectNamespace;
@@ -24,6 +30,7 @@ function createEmptyTeam(name: string): Team {
 
 export class Game extends DurableObject {
   private connections: Map<WebSocket, { playerId?: string }> = new Map();
+  private wsToPlayer: Map<WebSocket, string> = new Map(); // ws -> sessionId
   private state: GameState | null = null;
 
   constructor(ctx: DurableObjectState, env: GameEnv) {
@@ -75,6 +82,105 @@ export class Game extends DurableObject {
     await this.persistState();
 
     return { success: true };
+  }
+
+  // Player management methods
+  async handleJoin(payload: JoinPayload, ws: WebSocket): Promise<void> {
+    if (!this.state) {
+      throw new Error('Game not initialized');
+    }
+
+    const { playerName, sessionId, team } = payload;
+
+    // Check if player with this session already exists (reconnection case)
+    const existingPlayer = this.findPlayerBySession(sessionId);
+    if (existingPlayer) {
+      existingPlayer.connected = true;
+      existingPlayer.lastSeen = Date.now();
+      this.wsToPlayer.set(ws, sessionId);
+      this.connections.set(ws, { playerId: existingPlayer.id });
+      await this.persistState();
+      return;
+    }
+
+    // Create new player
+    const player: Player = {
+      id: crypto.randomUUID(),
+      name: playerName,
+      sessionId,
+      team: team || this.getTeamWithFewerPlayers(),
+      connected: true,
+      lastSeen: Date.now(),
+    };
+
+    // Assign to team
+    const targetTeam = player.team;
+    this.state.teams[targetTeam].players.push(player);
+
+    // Track connection
+    this.wsToPlayer.set(ws, sessionId);
+    this.connections.set(ws, { playerId: player.id });
+
+    this.state.lastActivityAt = Date.now();
+    await this.persistState();
+  }
+
+  async handleLeave(ws: WebSocket): Promise<void> {
+    if (!this.state) return;
+
+    const sessionId = this.wsToPlayer.get(ws);
+    if (!sessionId) return;
+
+    // Remove player from team
+    for (const teamKey of ['A', 'B'] as const) {
+      const team = this.state.teams[teamKey];
+      const index = team.players.findIndex(p => p.sessionId === sessionId);
+      if (index !== -1) {
+        team.players.splice(index, 1);
+        break;
+      }
+    }
+
+    this.wsToPlayer.delete(ws);
+    this.connections.delete(ws);
+    this.state.lastActivityAt = Date.now();
+    await this.persistState();
+  }
+
+  async handleDisconnect(ws: WebSocket): Promise<void> {
+    if (!this.state) return;
+
+    const sessionId = this.wsToPlayer.get(ws);
+    if (!sessionId) return;
+
+    const player = this.findPlayerBySession(sessionId);
+    if (player) {
+      player.connected = false;
+      player.lastSeen = Date.now();
+    }
+
+    this.wsToPlayer.delete(ws);
+    this.connections.delete(ws);
+    await this.persistState();
+  }
+
+  findPlayerBySession(sessionId: string): Player | undefined {
+    if (!this.state) return undefined;
+
+    for (const teamKey of ['A', 'B'] as const) {
+      const player = this.state.teams[teamKey].players.find(p => p.sessionId === sessionId);
+      if (player) return player;
+    }
+    return undefined;
+  }
+
+  private getTeamWithFewerPlayers(): 'A' | 'B' {
+    if (!this.state) return 'A';
+
+    const teamACount = this.state.teams.A.players.length;
+    const teamBCount = this.state.teams.B.players.length;
+
+    return teamACount <= teamBCount ? 'A' : 'B';
   }
 
   private async persistState(): Promise<void> {
