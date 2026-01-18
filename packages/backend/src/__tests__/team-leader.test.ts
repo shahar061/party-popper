@@ -77,4 +77,48 @@ describe('Team Leader', () => {
       );
     });
   });
+
+  describe('Auto-assign leader on game start', () => {
+    it('should auto-assign leader if team has no leader on game start', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'B' }, ws2);
+
+      // Neither player claimed leader
+      await game.handleStartGame('session-1');
+
+      const state = game.getState();
+      const teamALeader = state?.teams.A.players.find(p => p.isTeamLeader);
+      const teamBLeader = state?.teams.B.players.find(p => p.isTeamLeader);
+
+      expect(teamALeader).toBeDefined();
+      expect(teamBLeader).toBeDefined();
+    });
+
+    it('should not reassign leader if team already has one', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      const ws3 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2, ws3]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'A' }, ws2);
+      await game.handleJoin({ playerName: 'Charlie', sessionId: 'session-3', team: 'B' }, ws3);
+
+      // Alice claims leader for Team A
+      await game.handleClaimTeamLeader('session-1');
+
+      await game.handleStartGame('session-1');
+
+      const state = game.getState();
+      const alice = state?.teams.A.players.find(p => p.name === 'Alice');
+      const bob = state?.teams.A.players.find(p => p.name === 'Bob');
+
+      expect(alice?.isTeamLeader).toBe(true);
+      expect(bob?.isTeamLeader).toBe(false);
+    });
+  });
 });

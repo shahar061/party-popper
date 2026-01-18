@@ -374,6 +374,55 @@ export class Game extends DurableObject {
     return { success: true };
   }
 
+  async handleStartGame(
+    _sessionId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.state) {
+      return { success: false, error: 'Game not initialized' };
+    }
+
+    // Auto-assign leaders for teams without one
+    for (const teamId of ['A', 'B'] as const) {
+      const team = this.state.teams[teamId];
+      const hasLeader = team.players.some(p => p.isTeamLeader);
+
+      if (!hasLeader && team.players.length > 0) {
+        // Randomly select a leader
+        const randomIndex = Math.floor(Math.random() * team.players.length);
+        team.players[randomIndex].isTeamLeader = true;
+
+        this.broadcast({
+          type: 'leader_claimed',
+          payload: {
+            team: teamId,
+            playerId: team.players[randomIndex].id,
+            playerName: team.players[randomIndex].name,
+          },
+        });
+      }
+    }
+
+    // Transition to playing state
+    const transitionResult = await this.transitionTo('playing');
+    if (!transitionResult.success) {
+      return transitionResult;
+    }
+
+    // Start the first round
+    const roundResult = await this.startQuizRound();
+    if (!roundResult.success) {
+      return roundResult;
+    }
+
+    this.broadcast({ type: 'game_started', payload: {} });
+    this.broadcast({
+      type: 'state_sync',
+      payload: { gameState: this.state },
+    });
+
+    return { success: true };
+  }
+
   private getTeamWithFewerPlayers(): "A" | "B" {
     if (!this.state) return "A";
 
@@ -1236,26 +1285,15 @@ export class Game extends DurableObject {
           break;
 
         case "start_game":
-          const transitionResult = await this.transitionTo("playing");
-          if (transitionResult.success) {
-            const roundResult = await this.startQuizRound();
-            if (roundResult.success) {
-              this.broadcast({ type: 'game_started', payload: {} });
-              this.broadcast({
-                type: "state_sync",
-                payload: { gameState: this.state },
-              });
-            } else {
+          {
+            const sessionId = this.wsToPlayer.get(ws);
+            const startResult = await this.handleStartGame(sessionId || '');
+            if (!startResult.success) {
               this.sendToWs(ws, {
                 type: "error",
-                payload: { message: roundResult.error },
+                payload: { message: startResult.error },
               });
             }
-          } else {
-            this.sendToWs(ws, {
-              type: "error",
-              payload: { message: transitionResult.error },
-            });
           }
           break;
 
