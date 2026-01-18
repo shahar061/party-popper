@@ -1,4 +1,4 @@
-import type { GameState, Player, Round, Answer, TypingState, RoundResult, GameSettings } from './types';
+import type { GameState, Player, Round, Answer, TypingState, RoundResult, GameSettings, QuizOptions, Song, TimelineSong } from './types';
 
 /**
  * Client -> Server message types
@@ -15,7 +15,11 @@ export type ClientMessageType =
   | 'next_round'
   | 'reassign_team'
   | 'update_settings'
-  | 'pong';
+  | 'pong'
+  | 'submit_quiz'
+  | 'submit_placement'
+  | 'pass_veto'
+  | 'submit_veto_placement';
 
 /**
  * Client -> Server messages
@@ -32,7 +36,11 @@ export type ClientMessage =
   | NextRoundMessage
   | ReassignTeamMessage
   | UpdateSettingsMessage
-  | PongMessage;
+  | PongMessage
+  | SubmitQuizMessage
+  | SubmitPlacementMessage
+  | PassVetoMessage
+  | SubmitVetoPlacementMessage;
 
 export interface JoinMessage {
   type: 'join';
@@ -109,6 +117,32 @@ export interface PongMessage {
   type: 'pong';
 }
 
+export interface SubmitQuizMessage {
+  type: 'submit_quiz';
+  payload: {
+    artistIndex: number;
+    titleIndex: number;
+  };
+}
+
+export interface SubmitPlacementMessage {
+  type: 'submit_placement';
+  payload: {
+    position: number;
+  };
+}
+
+export interface PassVetoMessage {
+  type: 'pass_veto';
+}
+
+export interface SubmitVetoPlacementMessage {
+  type: 'submit_veto_placement';
+  payload: {
+    position: number;
+  };
+}
+
 /**
  * Server -> Client messages
  */
@@ -129,7 +163,14 @@ export type ServerMessage =
   | RoundResultMessage
   | GameOverMessage
   | ErrorMessage
-  | PingMessage;
+  | PingMessage
+  | PhaseChangedMessage
+  | QuizResultMessage
+  | PlacementSubmittedMessage
+  | VetoWindowOpenMessage
+  | VetoDecisionMessage
+  | NewRoundResultMessage
+  | GameWonMessage;
 
 export interface StateSyncMessage {
   type: 'state_sync';
@@ -259,6 +300,81 @@ export interface PingMessage {
   type: 'ping';
   payload: {
     timestamp: number;
+  };
+}
+
+export interface PhaseChangedMessage {
+  type: 'phase_changed';
+  payload: {
+    phase: string;
+    quizOptions?: QuizOptions;
+    endsAt: number;
+  };
+}
+
+export interface QuizResultMessage {
+  type: 'quiz_result';
+  payload: {
+    correct: boolean;
+    earnedToken: boolean;
+    correctArtist: string;
+    correctTitle: string;
+  };
+}
+
+export interface PlacementSubmittedMessage {
+  type: 'placement_submitted';
+  payload: {
+    teamId: 'A' | 'B';
+    position: number;
+    timelineSongCount: number;
+  };
+}
+
+export interface VetoWindowOpenMessage {
+  type: 'veto_window_open';
+  payload: {
+    vetoTeamId: 'A' | 'B';
+    activeTeamPlacement: number;
+    tokensAvailable: number;
+    endsAt: number;
+  };
+}
+
+export interface VetoDecisionMessage {
+  type: 'veto_decision';
+  payload: {
+    used: boolean;
+    vetoTeamId: 'A' | 'B';
+  };
+}
+
+export interface NewRoundResultMessage {
+  type: 'new_round_result';
+  payload: {
+    song: Song;
+    correctYear: number;
+    activeTeamPlacement: number;
+    activeTeamCorrect: boolean;
+    vetoUsed: boolean;
+    vetoTeamPlacement?: number;
+    vetoTeamCorrect?: boolean;
+    songAddedTo: 'A' | 'B' | null;
+    updatedTeams: {
+      A: { timeline: TimelineSong[]; tokens: number };
+      B: { timeline: TimelineSong[]; tokens: number };
+    };
+  };
+}
+
+export interface GameWonMessage {
+  type: 'game_won';
+  payload: {
+    winner: 'A' | 'B';
+    finalTeams: {
+      A: { timeline: TimelineSong[]; tokens: number };
+      B: { timeline: TimelineSong[]; tokens: number };
+    };
   };
 }
 
