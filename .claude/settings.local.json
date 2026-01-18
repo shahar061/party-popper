@@ -49,7 +49,22 @@
       "Skill(superpowers:finishing-a-development-branch:*)",
       "Bash(git merge:*)",
       "Bash(pnpm test:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(pnpm install:*)",
+      "Bash(npm run:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git stash:*)",
+      "Skill(superpowers:verification-before-completion)",
+      "Skill(superpowers:verification-before-completion:*)",
+      "Bash(/opt/homebrew/bin/pnpm test -- --run src/__tests__/team-leader.test.ts)",
+      "Bash(git pull:*)",
+      "Bash(cat:*)",
+      "Bash(tree:*)",
+      "Bash(npm:*)",
+      "Bash(pnpm --version:*)",
+      "Bash(/opt/homebrew/bin/pnpm:*)",
+      "Bash(npx pnpm --version)",
+      "Bash(npx pnpm:*)"
     ]
   }
 }

@@ -28,4 +28,4 @@ ENVIRONMENT = "development"
 
 # CORS origins for local development
 # In production, these would be the actual Cloudflare Pages URLs
-ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,https://priorities-fence-nathan-jill.trycloudflare.com"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,https://undefined-liable-hdtv-subjective.trycloudflare.com"

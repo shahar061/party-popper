@@ -11,7 +11,7 @@ describe('Game Durable Object', () => {
       getWebSockets: vi.fn().mockReturnValue([]),
       acceptWebSocket: vi.fn(),
     };
-    const mockEnv = {};
+    const mockEnv = {} as any;
 
     const game = new Game(mockState as any, mockEnv);
 
@@ -32,7 +32,7 @@ describe('Game Durable Object', () => {
       storage: { get: vi.fn(), put: vi.fn() },
       getWebSockets: vi.fn().mockReturnValue([]),
     };
-    const mockEnv = {};
+    const mockEnv = {} as any;
 
     const game = new Game(mockState as any, mockEnv);
 
@@ -53,7 +53,7 @@ describe('Team Leader', () => {
       getWebSockets: vi.fn().mockReturnValue([]),
       acceptWebSocket: vi.fn(),
     };
-    const mockEnv = {};
+    const mockEnv = {} as any;
 
     const game = new Game(mockCtx as any, mockEnv);
     await game.initialize('TEST123', 'classic');

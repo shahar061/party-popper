@@ -27,7 +27,7 @@ describe('REST API', () => {
     });
 
     const response = await handleRequest(request, mockEnv);
-    const body = await response.json();
+    const body = await response.json() as { joinCode: string };
 
     expect(response.status).toBe(201);
     expect(body).toHaveProperty('joinCode');
@@ -52,7 +52,7 @@ describe('REST API', () => {
     });
 
     const response = await handleRequest(request, mockEnv);
-    const body = await response.json();
+    const body = await response.json() as { joinCode: string; status: string };
 
     expect(response.status).toBe(200);
     expect(body.joinCode).toBe('ABCD');

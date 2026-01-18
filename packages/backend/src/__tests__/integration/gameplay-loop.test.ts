@@ -1,13 +1,13 @@
 // packages/backend/src/__tests__/integration/gameplay-loop.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { unstable_dev } from 'wrangler';
-import type { UnstableDevWorker } from 'wrangler';
+import type { Unstable_DevWorker } from 'wrangler';
 
 // NOTE: These integration tests require full backend WebSocket implementation
 // including API endpoints returning wsUrl and full message routing.
 // They are skipped until Phase 6 (Integration & Polish) completes the backend.
 describe.skip('Full Gameplay Loop Integration', () => {
-  let worker: UnstableDevWorker;
+  let worker: Unstable_DevWorker;
 
   beforeEach(async () => {
     worker = await unstable_dev('src/index.ts', {
@@ -26,7 +26,7 @@ describe.skip('Full Gameplay Loop Integration', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'classic', targetScore: 2 })
     });
-    const { joinCode, wsUrl } = await createRes.json();
+    const { joinCode, wsUrl } = await createRes.json() as { joinCode: string; wsUrl: string };
     expect(joinCode).toMatch(/^[A-Z0-9]{4}$/);
 
     // Step 2: Connect host via WebSocket
@@ -94,7 +94,7 @@ describe.skip('Full Gameplay Loop Integration', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'classic', targetScore: 5 })
     });
-    const { wsUrl } = await createRes.json();
+    const { wsUrl } = await createRes.json() as { wsUrl: string };
 
     const hostWs = new WebSocket(wsUrl);
     await waitForOpen(hostWs);
@@ -136,7 +136,7 @@ describe.skip('Full Gameplay Loop Integration', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'classic', targetScore: 5 })
     });
-    const { wsUrl } = await createRes.json();
+    const { wsUrl } = await createRes.json() as { wsUrl: string };
 
     const hostWs = new WebSocket(wsUrl);
     await waitForOpen(hostWs);

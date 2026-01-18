@@ -254,7 +254,7 @@ describe('Team Leader', () => {
       await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
 
       // Check that state_sync was sent to the player with isTeamLeader property
-      const calls = ws1.send.mock.calls;
+      const calls = (ws1.send as ReturnType<typeof vi.fn>).mock.calls;
       const stateSyncCall = calls.find((call: unknown[]) =>
         typeof call[0] === 'string' && call[0].includes('"type":"state_sync"')
       );

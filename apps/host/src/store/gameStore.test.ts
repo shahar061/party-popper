@@ -55,14 +55,14 @@ describe('gameStore', () => {
 
     useGameStore.getState().syncState(mockGameState);
 
-    const player: Player = { id: 'player-1', name: 'Alice', sessionId: 's1', team: 'A', connected: true, lastSeen: Date.now() };
+    const player: Player = { id: 'player-1', name: 'Alice', sessionId: 's1', team: 'A', connected: true, lastSeen: Date.now(), isTeamLeader: false };
     useGameStore.getState().addPlayer(player, 'A');
 
     expect(useGameStore.getState().game?.teams.A.players).toContainEqual(player);
   });
 
   it('should remove player from team', () => {
-    const player: Player = { id: 'player-1', name: 'Alice', sessionId: 's1', team: 'A', connected: true, lastSeen: Date.now() };
+    const player: Player = { id: 'player-1', name: 'Alice', sessionId: 's1', team: 'A', connected: true, lastSeen: Date.now(), isTeamLeader: false };
     const mockGameState: GameState = {
       id: 'game-123',
       joinCode: 'ABCD',
@@ -87,7 +87,7 @@ describe('gameStore', () => {
   });
 
   it('should move player between teams', () => {
-    const player: Player = { id: 'player-1', name: 'Alice', sessionId: 's1', team: 'A', connected: true, lastSeen: Date.now() };
+    const player: Player = { id: 'player-1', name: 'Alice', sessionId: 's1', team: 'A', connected: true, lastSeen: Date.now(), isTeamLeader: false };
     const mockGameState: GameState = {
       id: 'game-123',
       joinCode: 'ABCD',
