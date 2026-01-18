@@ -223,6 +223,40 @@ function App() {
     setScanDetected(false); // Reset scan detection state
   }, [playerState]);
 
+  // Handler for quiz submission
+  const handleSubmitQuiz = useCallback((artistIndex: number, titleIndex: number) => {
+    wsRef.current?.send(JSON.stringify({
+      type: 'submit_quiz',
+      payload: { artistIndex, titleIndex }
+    }));
+  }, []);
+
+  // Handler for placement submission
+  const handleSubmitPlacement = useCallback((position: number) => {
+    wsRef.current?.send(JSON.stringify({
+      type: 'submit_placement',
+      payload: { position }
+    }));
+  }, []);
+
+  // Handler for using veto
+  const handleUseVeto = useCallback(() => {
+    wsRef.current?.send(JSON.stringify({ type: 'use_veto' }));
+  }, []);
+
+  // Handler for passing on veto
+  const handlePassVeto = useCallback(() => {
+    wsRef.current?.send(JSON.stringify({ type: 'pass_veto' }));
+  }, []);
+
+  // Handler for veto placement submission
+  const handleSubmitVetoPlacement = useCallback((position: number) => {
+    wsRef.current?.send(JSON.stringify({
+      type: 'submit_veto_placement',
+      payload: { position }
+    }));
+  }, []);
+
   // Cleanup WebSocket and timeout on unmount
   useEffect(() => {
     return () => {
@@ -262,6 +296,11 @@ function App() {
           onTyping={handleTyping}
           onReady={handleReady}
           scanDetected={scanDetected}
+          onSubmitQuiz={handleSubmitQuiz}
+          onSubmitPlacement={handleSubmitPlacement}
+          onUseVeto={handleUseVeto}
+          onPassVeto={handlePassVeto}
+          onSubmitVetoPlacement={handleSubmitVetoPlacement}
         />
       )}
     </Layout>
