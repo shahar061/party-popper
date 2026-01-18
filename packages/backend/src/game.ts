@@ -506,6 +506,13 @@ export class Game extends DurableObject {
       return { success: false, correct: false, earnedToken: false };
     }
 
+    // Verify player is on active team
+    const allPlayers = [...this.state.teams.A.players, ...this.state.teams.B.players];
+    const player = allPlayers.find(p => p.id === playerId);
+    if (!player || player.team !== round.activeTeam) {
+      return { success: false, correct: false, earnedToken: false };
+    }
+
     const quizOptions = round.quizOptions;
     if (!quizOptions) {
       return { success: false, correct: false, earnedToken: false };
@@ -549,6 +556,13 @@ export class Game extends DurableObject {
 
     const round = this.state.currentRound;
     if (round.phase !== 'placement') {
+      return { success: false };
+    }
+
+    // Verify player is on active team
+    const allPlayers = [...this.state.teams.A.players, ...this.state.teams.B.players];
+    const player = allPlayers.find(p => p.id === playerId);
+    if (!player || player.team !== round.activeTeam) {
       return { success: false };
     }
 
@@ -596,6 +610,13 @@ export class Game extends DurableObject {
 
     const vetoTeam = round.activeTeam === 'A' ? 'B' : 'A';
 
+    // Verify player is on veto team (opposing team)
+    const allPlayers = [...this.state.teams.A.players, ...this.state.teams.B.players];
+    const player = allPlayers.find(p => p.id === playerId);
+    if (!player || player.team !== vetoTeam) {
+      return { success: false };
+    }
+
     if (useVeto && this.state.teams[vetoTeam].tokens < 1) {
       return { success: false };
     }
@@ -634,6 +655,14 @@ export class Game extends DurableObject {
 
     const round = this.state.currentRound;
     if (round.phase !== 'veto_placement') {
+      return { success: false };
+    }
+
+    // Verify player is on veto team (opposing team)
+    const vetoTeam = round.activeTeam === 'A' ? 'B' : 'A';
+    const allPlayers = [...this.state.teams.A.players, ...this.state.teams.B.players];
+    const player = allPlayers.find(p => p.id === playerId);
+    if (!player || player.team !== vetoTeam) {
       return { success: false };
     }
 
@@ -1140,7 +1169,10 @@ export class Game extends DurableObject {
             const sessionId = this.wsToPlayer.get(ws);
             const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
             if (player) {
-              await this.handleSubmitQuiz(payload.artistIndex, payload.titleIndex, player.id);
+              const result = await this.handleSubmitQuiz(payload.artistIndex, payload.titleIndex, player.id);
+              if (!result.success) {
+                this.sendToWs(ws, { type: 'error', payload: { code: 'HANDLER_ERROR', message: 'Failed to submit quiz' } });
+              }
             }
           }
           break;
@@ -1150,7 +1182,10 @@ export class Game extends DurableObject {
             const sessionId = this.wsToPlayer.get(ws);
             const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
             if (player) {
-              await this.handleSubmitPlacement(payload.position, player.id);
+              const result = await this.handleSubmitPlacement(payload.position, player.id);
+              if (!result.success) {
+                this.sendToWs(ws, { type: 'error', payload: { code: 'HANDLER_ERROR', message: 'Failed to submit placement' } });
+              }
             }
           }
           break;
@@ -1160,7 +1195,10 @@ export class Game extends DurableObject {
             const sessionId = this.wsToPlayer.get(ws);
             const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
             if (player) {
-              await this.handleVetoDecision(true, player.id);
+              const result = await this.handleVetoDecision(true, player.id);
+              if (!result.success) {
+                this.sendToWs(ws, { type: 'error', payload: { code: 'HANDLER_ERROR', message: 'Failed to use veto' } });
+              }
             }
           }
           break;
@@ -1170,7 +1208,10 @@ export class Game extends DurableObject {
             const sessionId = this.wsToPlayer.get(ws);
             const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
             if (player) {
-              await this.handleVetoDecision(false, player.id);
+              const result = await this.handleVetoDecision(false, player.id);
+              if (!result.success) {
+                this.sendToWs(ws, { type: 'error', payload: { code: 'HANDLER_ERROR', message: 'Failed to pass veto' } });
+              }
             }
           }
           break;
@@ -1180,7 +1221,10 @@ export class Game extends DurableObject {
             const sessionId = this.wsToPlayer.get(ws);
             const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
             if (player) {
-              await this.handleVetoPlacement(payload.position, player.id);
+              const result = await this.handleVetoPlacement(payload.position, player.id);
+              if (!result.success) {
+                this.sendToWs(ws, { type: 'error', payload: { code: 'HANDLER_ERROR', message: 'Failed to submit veto placement' } });
+              }
             }
           }
           break;
