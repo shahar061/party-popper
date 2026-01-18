@@ -1,4 +1,4 @@
-import type { GameState, Player, Round, Answer, TypingState, RoundResult, GameSettings, QuizOptions, Song, TimelineSong } from './types';
+import type { GameState, Player, Round, Answer, TypingState, RoundResult, GameSettings, QuizOptions, Song, TimelineSong, TeammateQuizVote, TeammatePlacementVote, TeammateVetoVote } from './types';
 
 /**
  * Client -> Server message types
@@ -19,7 +19,11 @@ export type ClientMessageType =
   | 'submit_quiz'
   | 'submit_placement'
   | 'pass_veto'
-  | 'submit_veto_placement';
+  | 'submit_veto_placement'
+  | 'claim_team_leader'
+  | 'submit_quiz_suggestion'
+  | 'submit_placement_suggestion'
+  | 'submit_veto_suggestion';
 
 /**
  * Client -> Server messages
@@ -40,7 +44,11 @@ export type ClientMessage =
   | SubmitQuizMessage
   | SubmitPlacementMessage
   | PassVetoMessage
-  | SubmitVetoPlacementMessage;
+  | SubmitVetoPlacementMessage
+  | ClaimTeamLeaderMessage
+  | SubmitQuizSuggestionMessage
+  | SubmitPlacementSuggestionMessage
+  | SubmitVetoSuggestionMessage;
 
 export interface JoinMessage {
   type: 'join';
@@ -143,6 +151,34 @@ export interface SubmitVetoPlacementMessage {
   };
 }
 
+// Team Leader Messages - Client to Server
+export interface ClaimTeamLeaderMessage {
+  type: 'claim_team_leader';
+  payload: Record<string, never>;  // No payload needed - uses session
+}
+
+export interface SubmitQuizSuggestionMessage {
+  type: 'submit_quiz_suggestion';
+  payload: {
+    artistIndex: number | null;
+    titleIndex: number | null;
+  };
+}
+
+export interface SubmitPlacementSuggestionMessage {
+  type: 'submit_placement_suggestion';
+  payload: {
+    position: number | null;
+  };
+}
+
+export interface SubmitVetoSuggestionMessage {
+  type: 'submit_veto_suggestion';
+  payload: {
+    useVeto: boolean | null;
+  };
+}
+
 /**
  * Server -> Client messages
  */
@@ -170,7 +206,11 @@ export type ServerMessage =
   | VetoWindowOpenMessage
   | VetoDecisionMessage
   | NewRoundResultMessage
-  | GameWonMessage;
+  | GameWonMessage
+  | LeaderClaimedMessage
+  | TeammateQuizVoteMessage
+  | TeammatePlacementVoteMessage
+  | TeammateVetoVoteMessage;
 
 export interface StateSyncMessage {
   type: 'state_sync';
@@ -376,6 +416,31 @@ export interface GameWonMessage {
       B: { timeline: TimelineSong[]; tokens: number };
     };
   };
+}
+
+// Team Leader Messages - Server to Client
+export interface LeaderClaimedMessage {
+  type: 'leader_claimed';
+  payload: {
+    team: 'A' | 'B';
+    playerId: string;
+    playerName: string;
+  };
+}
+
+export interface TeammateQuizVoteMessage {
+  type: 'teammate_quiz_vote';
+  payload: TeammateQuizVote;
+}
+
+export interface TeammatePlacementVoteMessage {
+  type: 'teammate_placement_vote';
+  payload: TeammatePlacementVote;
+}
+
+export interface TeammateVetoVoteMessage {
+  type: 'teammate_veto_vote';
+  payload: TeammateVetoVote;
 }
 
 export type ErrorCode =
