@@ -1463,7 +1463,10 @@ export class Game extends DurableObject {
     reason: string
   ): Promise<void> {
     console.log(`WebSocket closed: ${code} ${reason}`);
+    await this.handleClose(ws);
+  }
 
+  async handleClose(ws: WebSocket): Promise<void> {
     // Handle player disconnect
     const sessionId = this.wsToPlayer.get(ws);
     if (sessionId) {
@@ -1472,6 +1475,32 @@ export class Game extends DurableObject {
         // Mark player as disconnected
         player.connected = false;
         player.lastSeen = Date.now();
+
+        // Handle leader disconnect
+        if (player.isTeamLeader) {
+          player.isTeamLeader = false;
+
+          // If game is playing, auto-assign to first connected teammate
+          if (this.state && this.state.status === 'playing') {
+            const team = this.state.teams[player.team];
+            const connectedTeammate = team.players.find(
+              p => p.sessionId !== sessionId && p.connected
+            );
+            if (connectedTeammate) {
+              connectedTeammate.isTeamLeader = true;
+
+              // Broadcast leader_claimed for the new leader
+              this.broadcast({
+                type: 'leader_claimed',
+                payload: {
+                  team: player.team,
+                  playerId: connectedTeammate.id,
+                  playerName: connectedTeammate.name,
+                },
+              });
+            }
+          }
+        }
 
         // Broadcast player_left to all other connections
         this.broadcast({

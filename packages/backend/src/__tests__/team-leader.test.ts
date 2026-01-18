@@ -78,6 +78,44 @@ describe('Team Leader', () => {
     });
   });
 
+  describe('Leader disconnect handling', () => {
+    it('should reassign leader when leader disconnects during game', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      const ws3 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2, ws3]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'A' }, ws2);
+      await game.handleJoin({ playerName: 'Charlie', sessionId: 'session-3', team: 'B' }, ws3);
+
+      await game.handleClaimTeamLeader('session-1');
+      await game.handleStartGame('session-1');
+
+      // Alice disconnects - use handleClose for disconnect handling
+      await game.handleClose(ws1);
+
+      const state = game.getState();
+      const bob = state?.teams.A.players.find(p => p.name === 'Bob');
+      expect(bob?.isTeamLeader).toBe(true);
+    });
+
+    it('should make leader available again when leader disconnects in lobby', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'A' }, ws2);
+
+      await game.handleClaimTeamLeader('session-1');
+      await game.handleClose(ws1);
+
+      const result = await game.handleClaimTeamLeader('session-2');
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe('Auto-assign leader on game start', () => {
     it('should auto-assign leader if team has no leader on game start', async () => {
       const ws1 = createMockWebSocket();
