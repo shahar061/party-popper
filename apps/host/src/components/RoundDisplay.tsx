@@ -28,8 +28,9 @@ export function RoundDisplay({ round, teamName = 'Current Team', gameCode }: Rou
   };
 
   const isRevealed = round.phase === 'reveal';
-  // Timer hasn't started yet if endsAt is more than 2x the round duration
-  const timerStarted = remainingTime < (round.endsAt - round.startedAt) / 2;
+  // Timer hasn't started yet if endsAt is more than 5 minutes in the future
+  // (far future date indicates waiting for QR scan)
+  const timerStarted = round.endsAt - Date.now() < 5 * 60 * 1000;
 
   return (
     <div className="flex flex-col items-center gap-6 p-8">
