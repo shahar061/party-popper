@@ -151,7 +151,7 @@ function App() {
               break;
             }
             case 'phase_changed': {
-              const { phase, endsAt } = message.payload;
+              const { phase, endsAt, quizOptions } = message.payload;
               setGameState(prev => {
                 if (!prev || !prev.currentRound) return prev;
                 return {
@@ -160,6 +160,8 @@ function App() {
                     ...prev.currentRound,
                     phase,
                     endsAt,
+                    // Include quizOptions if provided (sent when transitioning to quiz phase)
+                    ...(quizOptions && { quizOptions }),
                   },
                 };
               });
