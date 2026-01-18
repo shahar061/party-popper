@@ -5,8 +5,8 @@ import { LobbyView } from '../components/LobbyView';
 const mockTeamA = {
   name: 'Team A',
   players: [
-    { id: '1', sessionId: 's1', name: 'Alice', team: 'A' as const, connected: true, lastSeen: Date.now() },
-    { id: '2', sessionId: 's2', name: 'Bob', team: 'A' as const, connected: true, lastSeen: Date.now() },
+    { id: '1', sessionId: 's1', name: 'Alice', team: 'A' as const, connected: true, lastSeen: Date.now(), isTeamLeader: true },
+    { id: '2', sessionId: 's2', name: 'Bob', team: 'A' as const, connected: true, lastSeen: Date.now(), isTeamLeader: false },
   ],
   timeline: [],
   tokens: 3,
@@ -16,8 +16,8 @@ const mockTeamA = {
 const mockTeamB = {
   name: 'Team B',
   players: [
-    { id: '3', sessionId: 's3', name: 'Charlie', team: 'B' as const, connected: true, lastSeen: Date.now() },
-    { id: '4', sessionId: 's4', name: 'Diana', team: 'B' as const, connected: false, lastSeen: Date.now() - 60000 },
+    { id: '3', sessionId: 's3', name: 'Charlie', team: 'B' as const, connected: true, lastSeen: Date.now(), isTeamLeader: true },
+    { id: '4', sessionId: 's4', name: 'Diana', team: 'B' as const, connected: false, lastSeen: Date.now() - 60000, isTeamLeader: false },
   ],
   timeline: [],
   tokens: 3,
@@ -90,7 +90,7 @@ describe('LobbyView', () => {
       ...mockTeamA,
       players: [
         ...mockTeamA.players,
-        { id: '5', sessionId: 's5', name: 'Eve', team: 'A' as const, connected: true, lastSeen: Date.now() },
+        { id: '5', sessionId: 's5', name: 'Eve', team: 'A' as const, connected: true, lastSeen: Date.now(), isTeamLeader: false },
       ],
     };
 

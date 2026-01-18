@@ -4,6 +4,7 @@ import { JoinScreen } from './components/JoinScreen';
 import { LobbyView } from './components/LobbyView';
 import { PlayingView } from './components/PlayingView';
 import { ConnectionStatus } from './components/ConnectionStatus';
+import { PlayerStatusRow } from './components/PlayerStatusRow';
 import type { GameState, Player, PlayerReadyMessage } from '@party-popper/shared';
 import { ConnectionState } from '@party-popper/shared';
 
@@ -235,6 +236,35 @@ function App() {
     }));
   }, []);
 
+  // Handler for claiming team leader
+  const handleClaimLeader = useCallback(() => {
+    wsRef.current?.send(JSON.stringify({ type: 'claim_team_leader' }));
+  }, []);
+
+  // Handler for quiz suggestion (non-leaders)
+  const handleQuizSuggestion = useCallback((artistIndex: number | null, titleIndex: number | null) => {
+    wsRef.current?.send(JSON.stringify({
+      type: 'submit_quiz_suggestion',
+      payload: { artistIndex, titleIndex }
+    }));
+  }, []);
+
+  // Handler for placement suggestion (non-leaders)
+  const handlePlacementSuggestion = useCallback((position: number) => {
+    wsRef.current?.send(JSON.stringify({
+      type: 'submit_placement_suggestion',
+      payload: { position }
+    }));
+  }, []);
+
+  // Handler for veto suggestion (non-leaders)
+  const handleVetoSuggestion = useCallback((useVeto: boolean) => {
+    wsRef.current?.send(JSON.stringify({
+      type: 'submit_veto_suggestion',
+      payload: { useVeto }
+    }));
+  }, []);
+
   // Cleanup WebSocket and timeout on unmount
   useEffect(() => {
     return () => {
@@ -245,8 +275,24 @@ function App() {
     };
   }, []);
 
+  // Get current player info for the status row
+  const currentPlayer = gameState && playerState
+    ? [...gameState.teams.A.players, ...gameState.teams.B.players].find(p => p.id === playerState.playerId)
+    : null;
+
+  const currentTeam = currentPlayer?.team;
+  const currentTeamName = currentTeam ? gameState?.teams[currentTeam].name || `Team ${currentTeam}` : '';
+
   return (
     <Layout>
+      {currentPlayer && (
+        <PlayerStatusRow
+          playerName={currentPlayer.name}
+          team={currentPlayer.team}
+          teamName={currentTeamName}
+          isTeamLeader={currentPlayer.isTeamLeader}
+        />
+      )}
       <ConnectionStatus state={connectionState} />
 
       {screen === 'join' && (
@@ -263,6 +309,7 @@ function App() {
           teamB={gameState.teams.B}
           currentPlayerId={playerState.playerId}
           gameCode={playerState.gameCode}
+          onClaimLeader={handleClaimLeader}
         />
       )}
 
@@ -277,6 +324,9 @@ function App() {
           onUseVeto={handleUseVeto}
           onPassVeto={handlePassVeto}
           onSubmitVetoPlacement={handleSubmitVetoPlacement}
+          onQuizSuggestion={handleQuizSuggestion}
+          onPlacementSuggestion={handlePlacementSuggestion}
+          onVetoSuggestion={handleVetoSuggestion}
         />
       )}
     </Layout>

@@ -6,6 +6,7 @@ interface LobbyViewProps {
   currentPlayerId: string;
   gameCode: string;
   isStarting?: boolean;
+  onClaimLeader?: () => void;
 }
 
 interface TeamColumnProps {
@@ -66,9 +67,15 @@ export function LobbyView({
   teamB,
   currentPlayerId,
   gameCode,
-  isStarting = false
+  isStarting = false,
+  onClaimLeader
 }: LobbyViewProps) {
   const totalPlayers = teamA.players.length + teamB.players.length;
+
+  // Find which team the current player is on
+  const currentPlayer = teamA.players.find(p => p.id === currentPlayerId) || teamB.players.find(p => p.id === currentPlayerId);
+  const myTeam = currentPlayer?.team === 'A' ? teamA : teamB;
+  const leader = myTeam.players.find(p => p.isTeamLeader);
 
   return (
     <div className="flex flex-col flex-1">
@@ -96,6 +103,25 @@ export function LobbyView({
           currentPlayerId={currentPlayerId}
         />
       </div>
+
+      {/* Team Leader Section */}
+      {currentPlayer && (
+        <div className="mt-4 text-center">
+          {leader ? (
+            <div className="inline-flex items-center gap-2 text-yellow-400 font-medium">
+              <span>👑</span>
+              <span>{leader.name} is your Team Leader</span>
+            </div>
+          ) : onClaimLeader ? (
+            <button
+              onClick={onClaimLeader}
+              className="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg transition-colors"
+            >
+              Be Team Leader
+            </button>
+          ) : null}
+        </div>
+      )}
 
       {/* Status footer */}
       <div className="mt-6 text-center py-4">

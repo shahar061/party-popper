@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { GameState, NewRoundPhase } from '@party-popper/shared';
+import type { GameState, NewRoundPhase, TeammateQuizVote, TeammatePlacementVote, TeammateVetoVote } from '@party-popper/shared';
 import { Layout } from './Layout';
 import { TurnStatus } from './TurnStatus';
 import { QuizForm } from './QuizForm';
@@ -16,6 +16,12 @@ interface PlayingViewProps {
   onSubmitVetoPlacement: (position: number) => void;
   onReady: () => void;
   scanDetected: boolean;
+  onQuizSuggestion?: (artistIndex: number | null, titleIndex: number | null) => void;
+  onPlacementSuggestion?: (position: number) => void;
+  onVetoSuggestion?: (useVeto: boolean) => void;
+  teamQuizVotes?: TeammateQuizVote[];
+  teamPlacementVotes?: TeammatePlacementVote[];
+  teamVetoVotes?: TeammateVetoVote[];
 }
 
 export function PlayingView({
@@ -28,25 +34,25 @@ export function PlayingView({
   onSubmitVetoPlacement,
   onReady,
   scanDetected,
+  onQuizSuggestion,
+  onPlacementSuggestion,
+  onVetoSuggestion,
+  teamQuizVotes = [],
+  teamPlacementVotes = [],
+  teamVetoVotes = [],
 }: PlayingViewProps) {
   const { currentRound, teams } = gameState;
   const [selectedPlacement, setSelectedPlacement] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
 
-  // Auto-confirm when scan is detected (after the 2-second delay in App.tsx)
-  useEffect(() => {
-    if (scanDetected) {
-      const timer = setTimeout(() => {
-        setConfirmed(true);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [scanDetected]);
-
   // Find which team the player is on
   const playerTeam = teams.A.players.find(p => p.id === playerId) ? 'A' : 'B';
   const myTeam = teams[playerTeam];
   const otherTeam = playerTeam === 'A' ? teams.B : teams.A;
+
+  // Check if current player is team leader
+  const currentPlayer = myTeam.players.find(p => p.id === playerId);
+  const isTeamLeader = currentPlayer?.isTeamLeader ?? false;
 
   // Timer effect
   useEffect(() => {
@@ -86,12 +92,20 @@ export function PlayingView({
 
   const handlePlacementSelect = (position: number) => {
     setSelectedPlacement(position);
-    onSubmitPlacement(position);
+    if (isTeamLeader) {
+      onSubmitPlacement(position);
+    } else if (onPlacementSuggestion) {
+      onPlacementSuggestion(position);
+    }
   };
 
   const handleVetoPlacementSelect = (position: number) => {
     setSelectedPlacement(position);
-    onSubmitVetoPlacement(position);
+    if (isTeamLeader) {
+      onSubmitVetoPlacement(position);
+    } else if (onPlacementSuggestion) {
+      onPlacementSuggestion(position);
+    }
   };
 
   // Get placement description for veto window
@@ -149,8 +163,11 @@ export function PlayingView({
             artists={currentRound.quizOptions.artists}
             songTitles={currentRound.quizOptions.songTitles}
             onSubmit={onSubmitQuiz}
+            onSuggestionChange={onQuizSuggestion}
             timeRemaining={timeRemaining}
             disabled={!!currentRound.quizAnswer}
+            isTeamLeader={isTeamLeader}
+            teamVotes={teamQuizVotes}
           />
         )}
 
@@ -161,6 +178,8 @@ export function PlayingView({
             selectedPosition={selectedPlacement}
             timeRemaining={timeRemaining}
             disabled={!!currentRound.placement}
+            isTeamLeader={isTeamLeader}
+            teamSuggestions={teamPlacementVotes}
           />
         )}
 
@@ -170,8 +189,11 @@ export function PlayingView({
             opponentPlacement={getPlacementDescription()}
             onUseVeto={onUseVeto}
             onPass={onPassVeto}
+            onSuggestionChange={onVetoSuggestion}
             timeRemaining={timeRemaining}
             disabled={!!currentRound.vetoDecision}
+            isTeamLeader={isTeamLeader}
+            teamSuggestions={teamVetoVotes}
           />
         )}
 
@@ -182,6 +204,8 @@ export function PlayingView({
             selectedPosition={selectedPlacement}
             timeRemaining={timeRemaining}
             disabled={!!currentRound.vetoPlacement}
+            isTeamLeader={isTeamLeader}
+            teamSuggestions={teamPlacementVotes}
           />
         )}
 

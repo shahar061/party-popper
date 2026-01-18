@@ -1,24 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { TeammateQuizVote } from '@party-popper/shared';
+import { TeamVotesPanel } from './TeamVotesPanel';
 
 interface QuizFormProps {
   artists: string[];
   songTitles: string[];
   onSubmit: (artistIndex: number, titleIndex: number) => void;
+  onSuggestionChange?: (artistIndex: number | null, titleIndex: number | null) => void;
   disabled?: boolean;
   timeRemaining?: number;
+  isTeamLeader?: boolean;
+  teamVotes?: TeammateQuizVote[];
 }
 
 export function QuizForm({
   artists,
   songTitles,
   onSubmit,
+  onSuggestionChange,
   disabled = false,
   timeRemaining,
+  isTeamLeader = true,
+  teamVotes = [],
 }: QuizFormProps) {
   const [selectedArtist, setSelectedArtist] = useState<number | null>(null);
   const [selectedTitle, setSelectedTitle] = useState<number | null>(null);
+  const [suggestionSent, setSuggestionSent] = useState(false);
 
   const canSubmit = selectedArtist !== null && selectedTitle !== null && !disabled;
+
+  // Send suggestion when selection changes (for non-leaders)
+  useEffect(() => {
+    if (!isTeamLeader && onSuggestionChange) {
+      onSuggestionChange(selectedArtist, selectedTitle);
+      if (selectedArtist !== null && selectedTitle !== null) {
+        setSuggestionSent(true);
+      }
+    }
+  }, [selectedArtist, selectedTitle, isTeamLeader, onSuggestionChange]);
 
   const handleSubmit = () => {
     if (selectedArtist !== null && selectedTitle !== null) {
@@ -79,18 +98,37 @@ export function QuizForm({
         </div>
       </div>
 
-      {/* Submit Button */}
-      <button
-        onClick={handleSubmit}
-        disabled={!canSubmit}
-        className={`w-full py-4 text-xl font-bold rounded-lg transition-colors ${
-          canSubmit
-            ? 'bg-green-500 text-white hover:bg-green-600'
-            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-        }`}
-      >
-        Submit Answer
-      </button>
+      {/* Team Votes Panel (for leaders only) */}
+      {isTeamLeader && teamVotes.length > 0 && (
+        <TeamVotesPanel votes={teamVotes} artists={artists} titles={songTitles} />
+      )}
+
+      {/* Submit Button or Suggestion Status */}
+      {isTeamLeader ? (
+        <button
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className={`w-full py-4 text-xl font-bold rounded-lg transition-colors ${
+            canSubmit
+              ? 'bg-green-500 text-white hover:bg-green-600'
+              : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          Submit Answer
+        </button>
+      ) : (
+        <div className="text-center py-4">
+          {suggestionSent ? (
+            <p className="text-green-400 font-medium">
+              Your suggestion has been sent to your team leader
+            </p>
+          ) : (
+            <p className="text-gray-400">
+              Select your answer to suggest it to your team leader
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

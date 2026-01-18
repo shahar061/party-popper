@@ -5,8 +5,8 @@ import { TeamAssignment } from '../components/TeamAssignment';
 const mockTeamA = {
   name: 'Team A',
   players: [
-    { id: '1', sessionId: 's1', name: 'Alice', team: 'A' as const, connected: true, lastSeen: Date.now() },
-    { id: '2', sessionId: 's2', name: 'Bob', team: 'A' as const, connected: true, lastSeen: Date.now() },
+    { id: '1', sessionId: 's1', name: 'Alice', team: 'A' as const, connected: true, lastSeen: Date.now(), isTeamLeader: true },
+    { id: '2', sessionId: 's2', name: 'Bob', team: 'A' as const, connected: true, lastSeen: Date.now(), isTeamLeader: false },
   ],
   timeline: [],
   tokens: 3,
@@ -16,7 +16,7 @@ const mockTeamA = {
 const mockTeamB = {
   name: 'Team B',
   players: [
-    { id: '3', sessionId: 's3', name: 'Charlie', team: 'B' as const, connected: true, lastSeen: Date.now() },
+    { id: '3', sessionId: 's3', name: 'Charlie', team: 'B' as const, connected: true, lastSeen: Date.now(), isTeamLeader: true },
   ],
   timeline: [],
   tokens: 3,

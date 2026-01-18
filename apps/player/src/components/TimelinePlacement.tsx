@@ -1,4 +1,5 @@
-import type { TimelineSong } from '@party-popper/shared';
+import type { TimelineSong, TeammatePlacementVote } from '@party-popper/shared';
+import { PlacementSuggestionsPanel } from './PlacementSuggestionsPanel';
 
 interface TimelinePlacementProps {
   timeline: TimelineSong[];
@@ -6,6 +7,8 @@ interface TimelinePlacementProps {
   selectedPosition: number | null;
   disabled?: boolean;
   timeRemaining?: number;
+  isTeamLeader?: boolean;
+  teamSuggestions?: TeammatePlacementVote[];
 }
 
 export function TimelinePlacement({
@@ -14,6 +17,8 @@ export function TimelinePlacement({
   selectedPosition,
   disabled = false,
   timeRemaining,
+  isTeamLeader = true,
+  teamSuggestions = [],
 }: TimelinePlacementProps) {
   // Create slots: one before each song and one after the last
   const slots = timeline.length + 1;
@@ -86,9 +91,17 @@ export function TimelinePlacement({
         )}
       </div>
 
+      {/* Team Suggestions Panel (for leaders only) */}
+      {isTeamLeader && teamSuggestions.length > 0 && (
+        <PlacementSuggestionsPanel votes={teamSuggestions} timeline={timeline} />
+      )}
+
+      {/* Status Message */}
       {selectedPosition !== null && (
         <div className="text-center text-green-400 font-medium">
-          Position selected - waiting for confirmation...
+          {isTeamLeader
+            ? 'Position selected - waiting for confirmation...'
+            : 'Your suggestion has been sent to your team leader'}
         </div>
       )}
     </div>
