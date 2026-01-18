@@ -3,6 +3,8 @@ import { TVLayout } from './TVLayout';
 import { ScoreBoard } from './ScoreBoard';
 import { RoundDisplay } from './RoundDisplay';
 import { AnswerDisplay } from './AnswerDisplay';
+import { TimelineDisplay } from './TimelineDisplay';
+import { VetoWindowDisplay } from './VetoWindowDisplay';
 
 interface GameplayScreenProps {
   game: GameState;
@@ -26,7 +28,21 @@ export function GameplayScreen({ game, onNextRound }: GameplayScreenProps) {
   }
 
   const activeTeam = teams[currentRound.activeTeam];
-  const { phase, currentAnswer } = currentRound;
+  const vetoTeam = currentRound.activeTeam === 'A' ? teams.B : teams.A;
+  const { phase, currentAnswer, placement } = currentRound;
+
+  // Calculate time remaining for veto window
+  const now = Date.now();
+  const vetoTimeRemaining = currentRound.endsAt - now;
+
+  // Generate placement description for veto display
+  const getPlacementDescription = (): string => {
+    if (!placement) return 'in timeline';
+    const timeline = activeTeam.timeline;
+    if (placement.position === 0) return 'at the beginning';
+    if (placement.position >= timeline.length) return 'at the end';
+    return `between position ${placement.position} and ${placement.position + 1}`;
+  };
 
   return (
     <TVLayout>
@@ -41,6 +57,26 @@ export function GameplayScreen({ game, onNextRound }: GameplayScreenProps) {
           targetScore={settings.targetScore}
         />
 
+        {/* Timeline Display - shows both team timelines with tokens */}
+        <TimelineDisplay
+          teamATimeline={teams.A.timeline}
+          teamBTimeline={teams.B.timeline}
+          teamAName={teams.A.name}
+          teamBName={teams.B.name}
+          teamATokens={teams.A.tokens}
+          teamBTokens={teams.B.tokens}
+        />
+
+        {/* Veto Window Display - only during veto_window phase */}
+        {phase === 'veto_window' && (
+          <VetoWindowDisplay
+            activeTeamName={activeTeam.name}
+            vetoTeamName={vetoTeam.name}
+            placement={getPlacementDescription()}
+            timeRemaining={vetoTimeRemaining}
+          />
+        )}
+
         {/* Round Display */}
         <RoundDisplay
           round={currentRound}
@@ -48,8 +84,8 @@ export function GameplayScreen({ game, onNextRound }: GameplayScreenProps) {
           gameCode={game.joinCode}
         />
 
-        {/* Answer Display (only show in reveal or waiting phase) */}
-        {(phase === 'reveal' || phase === 'waiting') && currentAnswer && (
+        {/* Answer Display (only show in reveal phase) */}
+        {phase === 'reveal' && currentAnswer && (
           <AnswerDisplay
             teamName={activeTeam.name}
             artist={currentAnswer.artist}
@@ -58,7 +94,7 @@ export function GameplayScreen({ game, onNextRound }: GameplayScreenProps) {
           />
         )}
 
-        {/* Next Round Button (only show in waiting phase) */}
+        {/* Next Round Button (only show in waiting phase - legacy) */}
         {phase === 'waiting' && (
           <button
             onClick={onNextRound}
@@ -70,9 +106,16 @@ export function GameplayScreen({ game, onNextRound }: GameplayScreenProps) {
 
         {/* Phase Indicator */}
         <div className="text-center text-game-muted text-xl">
+          {/* Legacy phases */}
           {phase === 'guessing' && 'Waiting for answer...'}
-          {phase === 'reveal' && 'Answer revealed!'}
           {phase === 'waiting' && 'Ready for next round'}
+          {/* New quiz phases */}
+          {phase === 'listening' && 'Listen to the song...'}
+          {phase === 'quiz' && `${activeTeam.name}: Answer the quiz!`}
+          {phase === 'placement' && `${activeTeam.name}: Place the song in your timeline!`}
+          {phase === 'veto_window' && `${vetoTeam.name}: Will you challenge?`}
+          {phase === 'veto_placement' && `${vetoTeam.name}: Place your guess!`}
+          {phase === 'reveal' && 'Answer revealed!'}
         </div>
       </div>
     </TVLayout>
