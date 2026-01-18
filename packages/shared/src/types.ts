@@ -44,6 +44,7 @@ export interface Player {
   team: 'A' | 'B';
   connected: boolean;
   lastSeen: number;
+  isTeamLeader: boolean;
 }
 
 export interface Song {
@@ -183,3 +184,22 @@ export const GAME_CONSTANTS = {
   RECONNECTION_WINDOW_MS: 5 * 60 * 1000,
   JOIN_CODE_LENGTH: 4,
 } as const;
+
+// Team Leader - Teammate Vote Tracking
+export interface TeammateVote {
+  playerId: string;
+  playerName: string;
+}
+
+export interface TeammateQuizVote extends TeammateVote {
+  artistIndex: number | null;
+  titleIndex: number | null;
+}
+
+export interface TeammatePlacementVote extends TeammateVote {
+  position: number | null;
+}
+
+export interface TeammateVetoVote extends TeammateVote {
+  useVeto: boolean | null;
+}
