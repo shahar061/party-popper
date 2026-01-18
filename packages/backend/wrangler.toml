@@ -9,7 +9,7 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["Game"]
+new_sqlite_classes = ["Game"]
 
 # KV namespace for join code -> game ID mapping
 [[kv_namespaces]]
