@@ -2,6 +2,10 @@ import { DurableObject } from 'cloudflare:workers';
 import type { GameState, GameStatus, GameMode, Team, Player, Song, Answer } from '@party-popper/shared';
 import { DEFAULT_SETTINGS, GAME_CONSTANTS } from '@party-popper/shared';
 import songsData from '../data/songs.json';
+import { generateQuizOptions } from './quiz-generator';
+import { validatePlacement, getCorrectPosition } from './placement-validator';
+import { RoundPhaseManager } from './round-phase-manager';
+import type { NewRoundPhase, QuizOptions, TimelineSong } from '@party-popper/shared';
 
 interface JoinPayload {
   playerName: string;
@@ -27,7 +31,7 @@ function createEmptyTeam(name: string): Team {
     name,
     players: [],
     timeline: [],
-    vetoTokens: 3,
+    tokens: 0,  // Changed from vetoTokens: 3
     score: 0,
   };
 }
@@ -344,7 +348,7 @@ export class Game extends DurableObject {
 
     // Create round
     const now = Date.now();
-    const roundDuration = this.state.settings.roundTimeSeconds * 1000;
+    const roundDuration = this.state.settings.quizTimeSeconds * 1000;
 
     this.state.currentRound = {
       number: roundNumber,
@@ -425,6 +429,330 @@ export class Game extends DurableObject {
     await this.persistState();
 
     return { success: true, gameFinished };
+  }
+
+  async startQuizRound(): Promise<{ success: boolean; error?: string }> {
+    if (!this.state) {
+      return { success: false, error: 'Game not initialized' };
+    }
+
+    if (this.state.status !== 'playing') {
+      return { success: false, error: 'Game must be in playing state' };
+    }
+
+    if (this.state.songPool.length === 0) {
+      return { success: false, error: 'No more songs available' };
+    }
+
+    const song = this.state.songPool.shift()!;
+    this.state.playedSongs.push(song);
+
+    const roundNumber = this.state.playedSongs.length;
+    const activeTeam: 'A' | 'B' = (roundNumber % 2 === 1) ? 'A' : 'B';
+
+    const quizOptions = generateQuizOptions(song, [...this.state.songPool, ...this.state.playedSongs]);
+
+    const now = Date.now();
+
+    this.state.currentRound = {
+      number: roundNumber,
+      song,
+      activeTeam,
+      phase: 'listening' as NewRoundPhase,
+      startedAt: now,
+      endsAt: now + (365 * 24 * 60 * 60 * 1000),
+      currentAnswer: null,
+      quizOptions,
+    };
+
+    this.state.lastActivityAt = now;
+    await this.persistState();
+
+    return { success: true };
+  }
+
+  async transitionToPhase(phase: NewRoundPhase): Promise<void> {
+    if (!this.state || !this.state.currentRound) return;
+
+    const now = Date.now();
+    const duration = RoundPhaseManager.getPhaseDuration(phase, this.state.settings);
+
+    this.state.currentRound.phase = phase;
+    this.state.currentRound.endsAt = duration > 0 ? now + duration : now + (365 * 24 * 60 * 60 * 1000);
+
+    await this.persistState();
+
+    this.broadcast({
+      type: 'phase_changed',
+      payload: {
+        phase,
+        quizOptions: phase === 'quiz' ? this.state.currentRound.quizOptions : undefined,
+        endsAt: this.state.currentRound.endsAt,
+      },
+    });
+  }
+
+  async handleSubmitQuiz(
+    artistIndex: number,
+    titleIndex: number,
+    playerId: string
+  ): Promise<{ success: boolean; correct: boolean; earnedToken: boolean }> {
+    if (!this.state || !this.state.currentRound) {
+      return { success: false, correct: false, earnedToken: false };
+    }
+
+    const round = this.state.currentRound;
+    if (round.phase !== 'quiz') {
+      return { success: false, correct: false, earnedToken: false };
+    }
+
+    const quizOptions = round.quizOptions;
+    if (!quizOptions) {
+      return { success: false, correct: false, earnedToken: false };
+    }
+
+    const artistCorrect = artistIndex === quizOptions.correctArtistIndex;
+    const titleCorrect = titleIndex === quizOptions.correctTitleIndex;
+    const bothCorrect = artistCorrect && titleCorrect;
+
+    round.quizAnswer = {
+      selectedArtistIndex: artistIndex,
+      selectedTitleIndex: titleIndex,
+      correct: bothCorrect,
+    };
+
+    if (bothCorrect) {
+      this.state.teams[round.activeTeam].tokens += 1;
+    }
+
+    await this.persistState();
+
+    this.broadcast({
+      type: 'quiz_result',
+      payload: {
+        correct: bothCorrect,
+        earnedToken: bothCorrect,
+        correctArtist: quizOptions.artists[quizOptions.correctArtistIndex],
+        correctTitle: quizOptions.songTitles[quizOptions.correctTitleIndex],
+      },
+    });
+
+    await this.transitionToPhase('placement');
+
+    return { success: true, correct: bothCorrect, earnedToken: bothCorrect };
+  }
+
+  async handleSubmitPlacement(position: number, playerId: string): Promise<{ success: boolean }> {
+    if (!this.state || !this.state.currentRound) {
+      return { success: false };
+    }
+
+    const round = this.state.currentRound;
+    if (round.phase !== 'placement') {
+      return { success: false };
+    }
+
+    round.placement = {
+      position,
+      placedAt: Date.now(),
+    };
+
+    await this.persistState();
+
+    this.broadcast({
+      type: 'placement_submitted',
+      payload: {
+        teamId: round.activeTeam,
+        position,
+        timelineSongCount: this.state.teams[round.activeTeam].timeline.length,
+      },
+    });
+
+    await this.transitionToPhase('veto_window');
+
+    const vetoTeam = round.activeTeam === 'A' ? 'B' : 'A';
+    this.broadcast({
+      type: 'veto_window_open',
+      payload: {
+        vetoTeamId: vetoTeam,
+        activeTeamPlacement: position,
+        tokensAvailable: this.state.teams[vetoTeam].tokens,
+        endsAt: this.state.currentRound.endsAt,
+      },
+    });
+
+    return { success: true };
+  }
+
+  async handleVetoDecision(useVeto: boolean, playerId: string): Promise<{ success: boolean }> {
+    if (!this.state || !this.state.currentRound) {
+      return { success: false };
+    }
+
+    const round = this.state.currentRound;
+    if (round.phase !== 'veto_window') {
+      return { success: false };
+    }
+
+    const vetoTeam = round.activeTeam === 'A' ? 'B' : 'A';
+
+    if (useVeto && this.state.teams[vetoTeam].tokens < 1) {
+      return { success: false };
+    }
+
+    round.vetoDecision = {
+      used: useVeto,
+      decidedAt: Date.now(),
+    };
+
+    if (useVeto) {
+      this.state.teams[vetoTeam].tokens -= 1;
+    }
+
+    await this.persistState();
+
+    this.broadcast({
+      type: 'veto_decision',
+      payload: {
+        used: useVeto,
+        vetoTeamId: vetoTeam,
+      },
+    });
+
+    const nextPhase = RoundPhaseManager.getNextPhase('veto_window', useVeto);
+    if (nextPhase) {
+      await this.transitionToPhase(nextPhase);
+    }
+
+    return { success: true };
+  }
+
+  async handleVetoPlacement(position: number, playerId: string): Promise<{ success: boolean }> {
+    if (!this.state || !this.state.currentRound) {
+      return { success: false };
+    }
+
+    const round = this.state.currentRound;
+    if (round.phase !== 'veto_placement') {
+      return { success: false };
+    }
+
+    if (round.placement && position === round.placement.position) {
+      return { success: false };
+    }
+
+    round.vetoPlacement = {
+      position,
+      placedAt: Date.now(),
+    };
+
+    await this.persistState();
+
+    await this.transitionToPhase('reveal');
+
+    return { success: true };
+  }
+
+  async resolveRound(): Promise<{
+    success: boolean;
+    songAddedTo: 'A' | 'B' | null;
+    gameFinished: boolean;
+  }> {
+    if (!this.state || !this.state.currentRound) {
+      return { success: false, songAddedTo: null, gameFinished: false };
+    }
+
+    const round = this.state.currentRound;
+    const song = round.song;
+    const activeTeam = round.activeTeam;
+    const vetoTeam = activeTeam === 'A' ? 'B' : 'A';
+
+    let songAddedTo: 'A' | 'B' | null = null;
+
+    const activeTeamTimeline = this.state.teams[activeTeam].timeline;
+    const vetoTeamTimeline = this.state.teams[vetoTeam].timeline;
+
+    const activeTeamCorrect = round.placement
+      ? validatePlacement(activeTeamTimeline, song.year, round.placement.position)
+      : false;
+
+    const vetoUsed = round.vetoDecision?.used ?? false;
+    const vetoTeamCorrect = round.vetoPlacement
+      ? validatePlacement(vetoTeamTimeline, song.year, round.vetoPlacement.position)
+      : false;
+
+    if (vetoUsed) {
+      if (vetoTeamCorrect) {
+        songAddedTo = vetoTeam;
+        this.addSongToTimeline(vetoTeam, song, round.vetoPlacement!.position);
+      }
+    } else {
+      if (activeTeamCorrect) {
+        songAddedTo = activeTeam;
+        this.addSongToTimeline(activeTeam, song, round.placement!.position);
+      }
+    }
+
+    this.state.teams.A.score = this.state.teams.A.timeline.length;
+    this.state.teams.B.score = this.state.teams.B.timeline.length;
+
+    const gameFinished =
+      this.state.teams.A.score >= this.state.settings.targetScore ||
+      this.state.teams.B.score >= this.state.settings.targetScore;
+
+    if (gameFinished) {
+      this.state.status = 'finished';
+    }
+
+    this.broadcast({
+      type: 'new_round_result',
+      payload: {
+        song,
+        correctYear: song.year,
+        activeTeamPlacement: round.placement?.position ?? -1,
+        activeTeamCorrect,
+        vetoUsed,
+        vetoTeamPlacement: round.vetoPlacement?.position,
+        vetoTeamCorrect: vetoUsed ? vetoTeamCorrect : undefined,
+        songAddedTo,
+        updatedTeams: {
+          A: { timeline: this.state.teams.A.timeline, tokens: this.state.teams.A.tokens },
+          B: { timeline: this.state.teams.B.timeline, tokens: this.state.teams.B.tokens },
+        },
+      },
+    });
+
+    if (gameFinished) {
+      const winner = this.state.teams.A.score >= this.state.settings.targetScore ? 'A' : 'B';
+      this.broadcast({
+        type: 'game_won',
+        payload: {
+          winner,
+          finalTeams: {
+            A: { timeline: this.state.teams.A.timeline, tokens: this.state.teams.A.tokens },
+            B: { timeline: this.state.teams.B.timeline, tokens: this.state.teams.B.tokens },
+          },
+        },
+      });
+    }
+
+    this.state.currentRound = null;
+    await this.persistState();
+
+    return { success: true, songAddedTo, gameFinished };
+  }
+
+  private addSongToTimeline(team: 'A' | 'B', song: Song, position: number): void {
+    if (!this.state) return;
+
+    const timelineSong: TimelineSong = {
+      ...song,
+      addedAt: Date.now(),
+      pointsEarned: 1,
+    };
+
+    this.state.teams[team].timeline.splice(position, 0, timelineSong);
+    this.state.teams[team].timeline.sort((a, b) => a.year - b.year);
   }
 
   // Broadcast methods
@@ -591,7 +919,7 @@ export class Game extends DurableObject {
       // Start the round timer if not already started
       if (this.state && this.state.currentRound) {
         const now = Date.now();
-        const roundDuration = this.state.settings.roundTimeSeconds * 1000;
+        const roundDuration = this.state.settings.quizTimeSeconds * 1000;
         const currentEndsAt = this.state.currentRound.endsAt;
 
         console.log('[Game] Current round timer endsAt:', new Date(currentEndsAt).toISOString());
@@ -602,6 +930,11 @@ export class Game extends DurableObject {
           console.log('[Game] Starting timer! New endsAt:', new Date(now + roundDuration).toISOString());
           this.state.currentRound.endsAt = now + roundDuration;
           await this.persistState();
+
+          // After updating endsAt, transition to quiz phase
+          if (this.state.currentRound.phase === 'listening') {
+            await this.transitionToPhase('quiz');
+          }
         } else {
           console.log('[Game] Timer already started, skipping update');
         }
@@ -728,10 +1061,8 @@ export class Game extends DurableObject {
         case 'start_game':
           const transitionResult = await this.transitionTo('playing');
           if (transitionResult.success) {
-            // Start first round
-            const roundResult = await this.startRound();
+            const roundResult = await this.startQuizRound();
             if (roundResult.success) {
-              // Broadcast game started and new state with first round
               this.broadcast({ type: 'game_started', payload: {} });
               this.broadcast({
                 type: 'state_sync',
@@ -777,29 +1108,80 @@ export class Game extends DurableObject {
           break;
 
         case 'next_round':
-          // Complete current round
-          const completeResult = await this.completeRound();
-          if (completeResult.success) {
-            if (completeResult.gameFinished) {
-              // Game is finished
-              this.broadcast({
-                type: 'state_sync',
-                payload: { gameState: this.state }
-              });
-            } else {
-              // Start next round
-              const nextRoundResult = await this.startRound();
+          if (this.state?.currentRound?.phase === 'reveal') {
+            const resolveResult = await this.resolveRound();
+            if (resolveResult.success && !resolveResult.gameFinished) {
+              const nextRoundResult = await this.startQuizRound();
               if (nextRoundResult.success) {
                 this.broadcast({
                   type: 'state_sync',
                   payload: { gameState: this.state }
                 });
-              } else {
-                this.sendToWs(ws, { type: 'error', payload: { message: nextRoundResult.error } });
               }
             }
           } else {
-            this.sendToWs(ws, { type: 'error', payload: { message: completeResult.error } });
+            const completeResult = await this.completeRound();
+            if (completeResult.success) {
+              if (!completeResult.gameFinished) {
+                const nextRoundResult = await this.startQuizRound();
+                if (nextRoundResult.success) {
+                  this.broadcast({
+                    type: 'state_sync',
+                    payload: { gameState: this.state }
+                  });
+                }
+              }
+            }
+          }
+          break;
+
+        case 'submit_quiz':
+          if (payload && payload.artistIndex !== undefined && payload.titleIndex !== undefined) {
+            const sessionId = this.wsToPlayer.get(ws);
+            const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
+            if (player) {
+              await this.handleSubmitQuiz(payload.artistIndex, payload.titleIndex, player.id);
+            }
+          }
+          break;
+
+        case 'submit_placement':
+          if (payload && payload.position !== undefined) {
+            const sessionId = this.wsToPlayer.get(ws);
+            const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
+            if (player) {
+              await this.handleSubmitPlacement(payload.position, player.id);
+            }
+          }
+          break;
+
+        case 'use_veto':
+          {
+            const sessionId = this.wsToPlayer.get(ws);
+            const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
+            if (player) {
+              await this.handleVetoDecision(true, player.id);
+            }
+          }
+          break;
+
+        case 'pass_veto':
+          {
+            const sessionId = this.wsToPlayer.get(ws);
+            const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
+            if (player) {
+              await this.handleVetoDecision(false, player.id);
+            }
+          }
+          break;
+
+        case 'submit_veto_placement':
+          if (payload && payload.position !== undefined) {
+            const sessionId = this.wsToPlayer.get(ws);
+            const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
+            if (player) {
+              await this.handleVetoPlacement(payload.position, player.id);
+            }
           }
           break;
 
