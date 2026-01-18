@@ -592,8 +592,22 @@ export class Game extends DurableObject {
     return { success: true };
   }
 
+  /**
+   * Clear all teammate vote maps between phases
+   */
+  clearTeammateVotes(): void {
+    this.teammateQuizVotes.clear();
+    this.teammatePlacementVotes.clear();
+    this.teammateVetoVotes.clear();
+  }
+
   async transitionToPhase(phase: NewRoundPhase): Promise<void> {
     if (!this.state || !this.state.currentRound) return;
+
+    // Clear teammate votes when entering quiz, placement, veto_window, or veto_placement phases
+    if (phase === 'quiz' || phase === 'placement' || phase === 'veto_window' || phase === 'veto_placement') {
+      this.clearTeammateVotes();
+    }
 
     const now = Date.now();
     const duration = RoundPhaseManager.getPhaseDuration(phase, this.state.settings);

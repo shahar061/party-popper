@@ -55,6 +55,8 @@ export function GameplayScreen({ game, onNextRound }: GameplayScreenProps) {
           teamBName={teams.B.name}
           activeTeam={currentRound.activeTeam}
           targetScore={settings.targetScore}
+          teamAPlayers={teams.A.players}
+          teamBPlayers={teams.B.players}
         />
 
         {/* Timeline Display - shows both team timelines with tokens */}

@@ -1,3 +1,5 @@
+import type { Player } from '@party-popper/shared';
+
 interface ScoreBoardProps {
   teamAScore: number;
   teamBScore: number;
@@ -5,6 +7,8 @@ interface ScoreBoardProps {
   teamBName: string;
   activeTeam: 'A' | 'B';
   targetScore: number;
+  teamAPlayers?: Player[];
+  teamBPlayers?: Player[];
 }
 
 export function ScoreBoard({
@@ -13,8 +17,13 @@ export function ScoreBoard({
   teamAName,
   teamBName,
   activeTeam,
-  targetScore
+  targetScore,
+  teamAPlayers,
+  teamBPlayers
 }: ScoreBoardProps) {
+  const teamALeader = teamAPlayers?.find(p => p.isTeamLeader);
+  const teamBLeader = teamBPlayers?.find(p => p.isTeamLeader);
+
   return (
     <div className="flex items-center justify-center gap-8">
       <TeamScore
@@ -24,6 +33,7 @@ export function ScoreBoard({
         isActive={activeTeam === 'A'}
         showIndicator={activeTeam === 'A'}
         indicatorTestId="turn-indicator-a"
+        leaderName={teamALeader?.name}
       />
 
       <div className="text-center">
@@ -38,6 +48,7 @@ export function ScoreBoard({
         isActive={activeTeam === 'B'}
         showIndicator={activeTeam === 'B'}
         indicatorTestId="turn-indicator-b"
+        leaderName={teamBLeader?.name}
       />
     </div>
   );
@@ -50,6 +61,7 @@ interface TeamScoreProps {
   isActive: boolean;
   showIndicator: boolean;
   indicatorTestId: string;
+  leaderName?: string;
 }
 
 function TeamScore({
@@ -58,7 +70,8 @@ function TeamScore({
   score,
   isActive,
   showIndicator,
-  indicatorTestId
+  indicatorTestId,
+  leaderName
 }: TeamScoreProps) {
   return (
     <div
@@ -79,6 +92,11 @@ function TeamScore({
       )}
 
       <div className="text-xl text-gray-300 mb-2">{name}</div>
+      {leaderName && (
+        <div className="text-sm text-yellow-400 mb-1">
+          👑 {leaderName}
+        </div>
+      )}
       <div className="text-6xl font-bold text-white">{score}</div>
     </div>
   );

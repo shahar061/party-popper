@@ -38,12 +38,21 @@ interface TeamColumnProps {
 function TeamColumn({ team, teamId, color, onMovePlayer }: TeamColumnProps) {
   const maxPlayers = GAME_CONSTANTS.MAX_PLAYERS_PER_TEAM;
   const emptySlots = maxPlayers - team.players.length;
+  const hasLeader = team.players.some(p => p.isTeamLeader);
+  const hasPlayers = team.players.length > 0;
 
   return (
     <div className={`bg-game-surface rounded-xl p-6 border-2 border-${color}-500`}>
       <h3 className={`text-tv-lg font-bold text-${color}-500 mb-6 text-center`}>
         {team.name}
       </h3>
+
+      {/* Show waiting for leader message if team has players but no leader */}
+      {hasPlayers && !hasLeader && (
+        <div className="text-center text-game-muted text-tv-sm mb-3 animate-pulse">
+          Waiting for leader...
+        </div>
+      )}
 
       <div className="space-y-3">
         {team.players.map((player) => (
@@ -87,7 +96,10 @@ function PlayerSlot({ player, color, oppositeTeam, onMovePlayer }: PlayerSlotPro
             player.connected ? `bg-${color}-500` : 'bg-game-muted'
           }`}
         />
-        <span className="text-tv-base text-game-text">{player.name}</span>
+        <span className="text-tv-base text-game-text">
+          {player.isTeamLeader && <span className="mr-1">👑</span>}
+          {player.name}
+        </span>
       </div>
 
       {onMovePlayer && (
