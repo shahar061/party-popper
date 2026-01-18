@@ -1,0 +1,31 @@
+name = "party-popper-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[durable_objects]
+bindings = [
+  { name = "GAME", class_name = "Game" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["Game"]
+
+# KV namespace for join code -> game ID mapping
+[[kv_namespaces]]
+binding = "GAME_CODES"
+id = "PLACEHOLDER_KV_ID"
+preview_id = "PLACEHOLDER_PREVIEW_KV_ID"
+
+[dev]
+port = 8787
+local_protocol = "http"
+ip = "0.0.0.0"
+
+# Environment variables
+[vars]
+ENVIRONMENT = "development"
+
+# CORS origins for local development
+# In production, these would be the actual Cloudflare Pages URLs
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,https://priorities-fence-nathan-jill.trycloudflare.com"

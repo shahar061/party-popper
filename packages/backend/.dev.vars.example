@@ -1,0 +1,7 @@
+# Copy this file to .dev.vars for local development
+# These values are for local development only
+
+# No secrets required for MVP
+# Add any future secrets here:
+# SPOTIFY_CLIENT_ID=your_client_id
+# SPOTIFY_CLIENT_SECRET=your_client_secret
