@@ -627,10 +627,15 @@ export class Game extends DurableObject {
       return { success: false, correct: false, earnedToken: false };
     }
 
-    // Verify player is on active team
+    // Verify player is on active team and is team leader
     const allPlayers = [...this.state.teams.A.players, ...this.state.teams.B.players];
     const player = allPlayers.find(p => p.id === playerId);
     if (!player || player.team !== round.activeTeam) {
+      return { success: false, correct: false, earnedToken: false };
+    }
+
+    // Only team leader can submit final quiz answer
+    if (!player.isTeamLeader) {
       return { success: false, correct: false, earnedToken: false };
     }
 
@@ -680,10 +685,15 @@ export class Game extends DurableObject {
       return { success: false };
     }
 
-    // Verify player is on active team
+    // Verify player is on active team and is team leader
     const allPlayers = [...this.state.teams.A.players, ...this.state.teams.B.players];
     const player = allPlayers.find(p => p.id === playerId);
     if (!player || player.team !== round.activeTeam) {
+      return { success: false };
+    }
+
+    // Only team leader can submit final placement
+    if (!player.isTeamLeader) {
       return { success: false };
     }
 
@@ -731,10 +741,15 @@ export class Game extends DurableObject {
 
     const vetoTeam = round.activeTeam === 'A' ? 'B' : 'A';
 
-    // Verify player is on veto team (opposing team)
+    // Verify player is on veto team (opposing team) and is team leader
     const allPlayers = [...this.state.teams.A.players, ...this.state.teams.B.players];
     const player = allPlayers.find(p => p.id === playerId);
     if (!player || player.team !== vetoTeam) {
+      return { success: false };
+    }
+
+    // Only team leader can make veto decision
+    if (!player.isTeamLeader) {
       return { success: false };
     }
 

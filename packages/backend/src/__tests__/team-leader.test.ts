@@ -243,4 +243,109 @@ describe('Team Leader', () => {
       expect(ws2.send).not.toHaveBeenCalled();
     });
   });
+
+  describe('Leader-only final decisions', () => {
+    it('should reject quiz submission from non-leader', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      const ws3 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2, ws3]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'A' }, ws2);
+      await game.handleJoin({ playerName: 'Charlie', sessionId: 'session-3', team: 'B' }, ws3);
+
+      await game.handleClaimTeamLeader('session-1'); // Alice is leader
+      await game.handleStartGame('session-1');
+
+      // Transition to quiz phase
+      await game.transitionToPhase('quiz');
+
+      const state = game.getState();
+      const bob = state?.teams.A.players.find(p => p.name === 'Bob');
+
+      // Bob (non-leader) tries to submit quiz
+      const result = await game.handleSubmitQuiz(0, 0, bob!.id);
+
+      expect(result.success).toBe(false);
+    });
+
+    it('should allow quiz submission from leader', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'B' }, ws2);
+
+      await game.handleClaimTeamLeader('session-1'); // Alice is leader
+      await game.handleStartGame('session-1');
+
+      // Transition to quiz phase
+      await game.transitionToPhase('quiz');
+
+      const state = game.getState();
+      const alice = state?.teams.A.players.find(p => p.name === 'Alice');
+
+      // Alice (leader) submits quiz
+      const result = await game.handleSubmitQuiz(0, 0, alice!.id);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject placement submission from non-leader', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      const ws3 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2, ws3]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'A' }, ws2);
+      await game.handleJoin({ playerName: 'Charlie', sessionId: 'session-3', team: 'B' }, ws3);
+
+      await game.handleClaimTeamLeader('session-1'); // Alice is leader
+      await game.handleStartGame('session-1');
+
+      // Transition to placement phase
+      await game.transitionToPhase('placement');
+
+      const state = game.getState();
+      const bob = state?.teams.A.players.find(p => p.name === 'Bob');
+
+      // Bob (non-leader) tries to submit placement
+      const result = await game.handleSubmitPlacement(0, bob!.id);
+
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject veto decision from non-leader', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      const ws3 = createMockWebSocket();
+      const ws4 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2, ws3, ws4]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'B' }, ws2);
+      await game.handleJoin({ playerName: 'Charlie', sessionId: 'session-3', team: 'B' }, ws3);
+      await game.handleJoin({ playerName: 'Dan', sessionId: 'session-4', team: 'A' }, ws4);
+
+      await game.handleClaimTeamLeader('session-1'); // Alice is Team A leader
+      await game.handleClaimTeamLeader('session-2'); // Bob is Team B leader
+      await game.handleStartGame('session-1');
+
+      // Transition to veto_window phase
+      await game.transitionToPhase('veto_window');
+
+      const state = game.getState();
+      // Team A is active, so Team B can veto
+      // Charlie is on Team B but not the leader
+      const charlie = state?.teams.B.players.find(p => p.name === 'Charlie');
+
+      // Charlie (non-leader) tries to make veto decision
+      const result = await game.handleVetoDecision(true, charlie!.id);
+
+      expect(result.success).toBe(false);
+    });
+  });
 });
