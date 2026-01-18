@@ -31,7 +31,7 @@ export interface Team {
   name: string;
   players: Player[];
   timeline: TimelineSong[];
-  vetoTokens: number;
+  tokens: number;  // Renamed from vetoTokens - earned from correct quizzes
   score: number;
 }
 
@@ -62,15 +62,59 @@ export interface Round {
   number: number;
   song: Song;
   activeTeam: 'A' | 'B';
-  phase: RoundPhase;
+  phase: RoundPhase | NewRoundPhase;
   startedAt: number;
   endsAt: number;
+  // Old fields (deprecated but kept for compatibility)
   currentAnswer: Answer | null;
-  typingState?: TypingState | null; // Not used in v1 minimal gameplay
-  vetoChallenge?: VetoChallenge | null; // Not used in v1 minimal gameplay
+  typingState?: TypingState | null;
+  vetoChallenge?: VetoChallenge | null;
+  // New quiz fields
+  quizOptions?: QuizOptions;
+  quizAnswer?: QuizAnswer;
+  placement?: TimelinePlacement;
+  vetoDecision?: VetoDecision;
+  vetoPlacement?: VetoPlacement;
 }
 
 export type RoundPhase = 'guessing' | 'reveal' | 'waiting';
+
+// New 6-phase round system
+export type NewRoundPhase =
+  | 'listening'      // QR scan, waiting for song to play
+  | 'quiz'           // Multiple choice artist + song
+  | 'placement'      // Timeline placement by active team
+  | 'veto_window'    // Other team decides to challenge
+  | 'veto_placement' // Veto team places their guess
+  | 'reveal';        // Show correct answer, update timelines
+
+export interface QuizOptions {
+  artists: string[];      // 4 options, 1 correct
+  songTitles: string[];   // 4 options, 1 correct
+  correctArtistIndex: number;
+  correctTitleIndex: number;
+}
+
+export interface QuizAnswer {
+  selectedArtistIndex: number;
+  selectedTitleIndex: number;
+  correct: boolean;  // Both must match
+}
+
+export interface TimelinePlacement {
+  position: number;  // Index where song would be inserted (0 = before first, etc.)
+  placedAt: number;  // Timestamp
+}
+
+export interface VetoDecision {
+  used: boolean;
+  decidedAt: number;
+}
+
+export interface VetoPlacement {
+  position: number;
+  placedAt: number;
+}
 
 export interface Answer {
   artist: string;
