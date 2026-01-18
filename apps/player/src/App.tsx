@@ -150,6 +150,21 @@ function App() {
               }, 2000);
               break;
             }
+            case 'phase_changed': {
+              const { phase, endsAt } = message.payload;
+              setGameState(prev => {
+                if (!prev || !prev.currentRound) return prev;
+                return {
+                  ...prev,
+                  currentRound: {
+                    ...prev.currentRound,
+                    phase,
+                    endsAt,
+                  },
+                };
+              });
+              break;
+            }
             case 'error': {
               setError(message.payload.message);
               setIsLoading(false);

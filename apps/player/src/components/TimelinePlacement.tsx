@@ -4,6 +4,7 @@ import { PlacementSuggestionsPanel } from './PlacementSuggestionsPanel';
 interface TimelinePlacementProps {
   timeline: TimelineSong[];
   onSelectPosition: (position: number) => void;
+  onConfirm?: () => void;
   selectedPosition: number | null;
   disabled?: boolean;
   timeRemaining?: number;
@@ -14,6 +15,7 @@ interface TimelinePlacementProps {
 export function TimelinePlacement({
   timeline,
   onSelectPosition,
+  onConfirm,
   selectedPosition,
   disabled = false,
   timeRemaining,
@@ -22,6 +24,8 @@ export function TimelinePlacement({
 }: TimelinePlacementProps) {
   // Create slots: one before each song and one after the last
   const slots = timeline.length + 1;
+
+  const canConfirm = isTeamLeader && selectedPosition !== null && !disabled && onConfirm;
 
   return (
     <div className="w-full max-w-md space-y-4">
@@ -96,12 +100,25 @@ export function TimelinePlacement({
         <PlacementSuggestionsPanel votes={teamSuggestions} timeline={timeline} />
       )}
 
+      {/* Confirm Button (for leaders only) */}
+      {isTeamLeader && selectedPosition !== null && (
+        <button
+          onClick={onConfirm}
+          disabled={!canConfirm}
+          className={`w-full py-4 text-xl font-bold rounded-lg transition-colors ${
+            canConfirm
+              ? 'bg-green-500 text-white hover:bg-green-600'
+              : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          Confirm Placement
+        </button>
+      )}
+
       {/* Status Message */}
-      {selectedPosition !== null && (
+      {selectedPosition !== null && !isTeamLeader && (
         <div className="text-center text-green-400 font-medium">
-          {isTeamLeader
-            ? 'Position selected - waiting for confirmation...'
-            : 'Your suggestion has been sent to your team leader'}
+          Your suggestion has been sent to your team leader
         </div>
       )}
     </div>

@@ -92,19 +92,29 @@ export function PlayingView({
 
   const handlePlacementSelect = (position: number) => {
     setSelectedPlacement(position);
-    if (isTeamLeader) {
-      onSubmitPlacement(position);
-    } else if (onPlacementSuggestion) {
+    // Non-leaders send suggestions immediately
+    if (!isTeamLeader && onPlacementSuggestion) {
       onPlacementSuggestion(position);
+    }
+  };
+
+  const handlePlacementConfirm = () => {
+    if (selectedPlacement !== null) {
+      onSubmitPlacement(selectedPlacement);
     }
   };
 
   const handleVetoPlacementSelect = (position: number) => {
     setSelectedPlacement(position);
-    if (isTeamLeader) {
-      onSubmitVetoPlacement(position);
-    } else if (onPlacementSuggestion) {
+    // Non-leaders send suggestions immediately
+    if (!isTeamLeader && onPlacementSuggestion) {
       onPlacementSuggestion(position);
+    }
+  };
+
+  const handleVetoPlacementConfirm = () => {
+    if (selectedPlacement !== null) {
+      onSubmitVetoPlacement(selectedPlacement);
     }
   };
 
@@ -175,6 +185,7 @@ export function PlayingView({
           <TimelinePlacement
             timeline={myTeam.timeline}
             onSelectPosition={handlePlacementSelect}
+            onConfirm={handlePlacementConfirm}
             selectedPosition={selectedPlacement}
             timeRemaining={timeRemaining}
             disabled={!!currentRound.placement}
@@ -201,6 +212,7 @@ export function PlayingView({
           <TimelinePlacement
             timeline={myTeam.timeline}
             onSelectPosition={handleVetoPlacementSelect}
+            onConfirm={handleVetoPlacementConfirm}
             selectedPosition={selectedPlacement}
             timeRemaining={timeRemaining}
             disabled={!!currentRound.vetoPlacement}

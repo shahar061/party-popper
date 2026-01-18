@@ -617,6 +617,11 @@ export class Game extends DurableObject {
 
     await this.persistState();
 
+    // Schedule alarm for timed phases
+    if (duration > 0) {
+      await this.ctx.storage.setAlarm(this.state.currentRound.endsAt);
+    }
+
     this.broadcast({
       type: 'phase_changed',
       payload: {
@@ -625,6 +630,164 @@ export class Game extends DurableObject {
         endsAt: this.state.currentRound.endsAt,
       },
     });
+  }
+
+  /**
+   * Durable Object alarm handler - called when phase timer expires
+   */
+  async alarm(): Promise<void> {
+    // Load state if not loaded
+    if (!this.state) {
+      await this.loadState();
+    }
+
+    if (!this.state || !this.state.currentRound) return;
+
+    const phase = this.state.currentRound.phase as NewRoundPhase;
+    console.log(`[Game] Alarm triggered for phase: ${phase}`);
+
+    switch (phase) {
+      case 'quiz':
+        await this.handleQuizTimeout();
+        break;
+      case 'placement':
+        await this.handlePlacementTimeout();
+        break;
+      case 'veto_window':
+        await this.handleVetoWindowTimeout();
+        break;
+      case 'veto_placement':
+        await this.handleVetoPlacementTimeout();
+        break;
+      default:
+        // No timeout handling for listening or reveal phases
+        break;
+    }
+  }
+
+  /**
+   * Quiz timeout: No answer submitted, proceed to placement without token
+   */
+  private async handleQuizTimeout(): Promise<void> {
+    if (!this.state || !this.state.currentRound) return;
+    if (this.state.currentRound.phase !== 'quiz') return;
+
+    const round = this.state.currentRound;
+    const quizOptions = round.quizOptions;
+
+    // Mark as timed out (no correct answer)
+    round.quizAnswer = {
+      selectedArtistIndex: -1,
+      selectedTitleIndex: -1,
+      correct: false,
+    };
+
+    await this.persistState();
+
+    // Broadcast timeout result
+    this.broadcast({
+      type: 'quiz_result',
+      payload: {
+        correct: false,
+        earnedToken: false,
+        correctArtist: quizOptions?.artists[quizOptions.correctArtistIndex] ?? '',
+        correctTitle: quizOptions?.songTitles[quizOptions.correctTitleIndex] ?? '',
+        timedOut: true,
+      },
+    });
+
+    await this.transitionToPhase('placement');
+  }
+
+  /**
+   * Placement timeout: No placement made, skip to veto window (song won't be added)
+   */
+  private async handlePlacementTimeout(): Promise<void> {
+    if (!this.state || !this.state.currentRound) return;
+    if (this.state.currentRound.phase !== 'placement') return;
+
+    const round = this.state.currentRound;
+
+    // Mark placement as timed out (position -1 indicates no placement)
+    round.placement = {
+      position: -1,
+      placedAt: Date.now(),
+    };
+
+    await this.persistState();
+
+    this.broadcast({
+      type: 'placement_submitted',
+      payload: {
+        teamId: round.activeTeam,
+        position: -1,
+        timelineSongCount: this.state.teams[round.activeTeam].timeline.length,
+        timedOut: true,
+      },
+    });
+
+    await this.transitionToPhase('veto_window');
+
+    const vetoTeam = round.activeTeam === 'A' ? 'B' : 'A';
+    this.broadcast({
+      type: 'veto_window_open',
+      payload: {
+        vetoTeamId: vetoTeam,
+        activeTeamPlacement: -1,
+        tokensAvailable: this.state.teams[vetoTeam].tokens,
+        endsAt: this.state.currentRound.endsAt,
+      },
+    });
+  }
+
+  /**
+   * Veto window timeout: Auto-pass veto, proceed to reveal
+   */
+  private async handleVetoWindowTimeout(): Promise<void> {
+    if (!this.state || !this.state.currentRound) return;
+    if (this.state.currentRound.phase !== 'veto_window') return;
+
+    const round = this.state.currentRound;
+    const vetoTeam = round.activeTeam === 'A' ? 'B' : 'A';
+
+    // Auto-pass veto
+    round.vetoDecision = {
+      used: false,
+      decidedAt: Date.now(),
+    };
+
+    await this.persistState();
+
+    this.broadcast({
+      type: 'veto_decision',
+      payload: {
+        used: false,
+        vetoTeamId: vetoTeam,
+        timedOut: true,
+      },
+    });
+
+    await this.transitionToPhase('reveal');
+  }
+
+  /**
+   * Veto placement timeout: Veto team loses their chance, proceed to reveal
+   */
+  private async handleVetoPlacementTimeout(): Promise<void> {
+    if (!this.state || !this.state.currentRound) return;
+    if (this.state.currentRound.phase !== 'veto_placement') return;
+
+    const round = this.state.currentRound;
+
+    // Mark veto placement as timed out (position -1 indicates no placement)
+    round.vetoPlacement = {
+      position: -1,
+      placedAt: Date.now(),
+    };
+
+    await this.persistState();
+
+    await this.transitionToPhase('reveal');
   }
 
   async handleSubmitQuiz(
@@ -672,6 +835,9 @@ export class Game extends DurableObject {
       this.state.teams[round.activeTeam].tokens += 1;
     }
 
+    // Cancel the timeout alarm since action was taken
+    await this.ctx.storage.deleteAlarm();
+
     await this.persistState();
 
     this.broadcast({
@@ -715,6 +881,9 @@ export class Game extends DurableObject {
       position,
       placedAt: Date.now(),
     };
+
+    // Cancel the timeout alarm since action was taken
+    await this.ctx.storage.deleteAlarm();
 
     await this.persistState();
 
@@ -780,6 +949,9 @@ export class Game extends DurableObject {
       this.state.teams[vetoTeam].tokens -= 1;
     }
 
+    // Cancel the timeout alarm since action was taken
+    await this.ctx.storage.deleteAlarm();
+
     await this.persistState();
 
     this.broadcast({
@@ -824,6 +996,9 @@ export class Game extends DurableObject {
       position,
       placedAt: Date.now(),
     };
+
+    // Cancel the timeout alarm since action was taken
+    await this.ctx.storage.deleteAlarm();
 
     await this.persistState();
 
