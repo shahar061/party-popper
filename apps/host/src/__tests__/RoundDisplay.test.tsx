@@ -18,12 +18,17 @@ describe('RoundDisplay', () => {
       spotifyUrl: 'https://open.spotify.com/track/abc123'
     },
     activeTeam: 'A',
-    phase: 'guessing',
+    phase: 'quiz',
     startedAt: now,
     endsAt: now + 60000,
     currentAnswer: null,
     typingState: null,
     vetoChallenge: null
+  };
+
+  const listeningRound: Round = {
+    ...mockRound,
+    phase: 'listening'
   };
 
   beforeEach(() => {
@@ -35,8 +40,8 @@ describe('RoundDisplay', () => {
     vi.useRealTimers();
   });
 
-  it('should render QR code with Spotify deeplink', () => {
-    render(<RoundDisplay round={mockRound} gameCode="TEST" />);
+  it('should render QR code with Spotify deeplink in listening phase', () => {
+    render(<RoundDisplay round={listeningRound} gameCode="TEST" />);
 
     const qrCode = screen.getByTestId('song-qr-code');
     expect(qrCode).toBeInTheDocument();
@@ -48,7 +53,7 @@ describe('RoundDisplay', () => {
     expect(screen.getByTestId('round-timer')).toBeInTheDocument();
   });
 
-  it('should hide song details during guessing phase', () => {
+  it('should hide song details during quiz phase', () => {
     render(<RoundDisplay round={mockRound} gameCode="TEST" />);
 
     expect(screen.queryByText('Hidden Song')).not.toBeInTheDocument();
@@ -70,10 +75,21 @@ describe('RoundDisplay', () => {
     expect(screen.getByText(/Team Alpha/)).toBeInTheDocument();
   });
 
-  it('should format timer correctly', () => {
+  it('should format timer correctly in quiz phase', () => {
     render(<RoundDisplay round={mockRound} gameCode="TEST" />);
 
-    // Timer should show 1:00 initially
+    // Timer should show 1:00 initially in quiz phase (not waiting for scan)
     expect(screen.getByTestId('round-timer')).toHaveTextContent('1:00');
+  });
+
+  it('should show waiting for scan in listening phase before timer starts', () => {
+    // Create a round with endsAt far in the future (timer not started)
+    const waitingRound: Round = {
+      ...listeningRound,
+      endsAt: now + 10 * 60 * 1000 // 10 minutes in future
+    };
+    render(<RoundDisplay round={waitingRound} gameCode="TEST" />);
+
+    expect(screen.getByTestId('round-timer')).toHaveTextContent('Waiting for scan...');
   });
 });
