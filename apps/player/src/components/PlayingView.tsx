@@ -1,14 +1,19 @@
-import { useState } from 'react';
-import type { GameState } from '@party-popper/shared';
+import { useState, useEffect } from 'react';
+import type { GameState, NewRoundPhase } from '@party-popper/shared';
 import { Layout } from './Layout';
 import { TurnStatus } from './TurnStatus';
-import { AnswerForm } from './AnswerForm';
+import { QuizForm } from './QuizForm';
+import { TimelinePlacement } from './TimelinePlacement';
+import { VetoDecision } from './VetoDecision';
 
 interface PlayingViewProps {
   gameState: GameState;
   playerId: string;
-  onSubmitAnswer: (data: { artist: string; title: string; year: number }) => void;
-  onTyping: (field: string, value: string) => void;
+  onSubmitQuiz: (artistIndex: number, titleIndex: number) => void;
+  onSubmitPlacement: (position: number) => void;
+  onUseVeto: () => void;
+  onPassVeto: () => void;
+  onSubmitVetoPlacement: (position: number) => void;
   onReady: () => void;
   scanDetected: boolean;
 }
@@ -16,18 +21,41 @@ interface PlayingViewProps {
 export function PlayingView({
   gameState,
   playerId,
-  onSubmitAnswer,
-  onTyping,
+  onSubmitQuiz,
+  onSubmitPlacement,
+  onUseVeto,
+  onPassVeto,
+  onSubmitVetoPlacement,
   onReady,
   scanDetected,
 }: PlayingViewProps) {
   const { currentRound, teams } = gameState;
-  const [confirmed, setConfirmed] = useState(false);
+  const [selectedPlacement, setSelectedPlacement] = useState<number | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
 
   // Find which team the player is on
   const playerTeam = teams.A.players.find(p => p.id === playerId) ? 'A' : 'B';
   const myTeam = teams[playerTeam];
   const otherTeam = playerTeam === 'A' ? teams.B : teams.A;
+
+  // Timer effect
+  useEffect(() => {
+    if (!currentRound) return;
+
+    const updateTimer = () => {
+      const remaining = Math.max(0, currentRound.endsAt - Date.now());
+      setTimeRemaining(remaining);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 100);
+    return () => clearInterval(interval);
+  }, [currentRound?.endsAt]);
+
+  // Reset placement when phase changes
+  useEffect(() => {
+    setSelectedPlacement(null);
+  }, [currentRound?.phase]);
 
   if (!currentRound) {
     return (
@@ -43,13 +71,30 @@ export function PlayingView({
   }
 
   const isMyTurn = currentRound.activeTeam === playerTeam;
-  const { phase } = currentRound;
+  const phase = currentRound.phase as NewRoundPhase;
+  const isVetoTeam = !isMyTurn;
 
-  // Show answer form only when:
-  // 1. It's my team's turn
-  // 2. Phase is 'guessing'
-  // 3. No answer submitted yet
-  const canSubmitAnswer = isMyTurn && phase === 'guessing' && !currentRound.currentAnswer;
+  const handlePlacementSelect = (position: number) => {
+    setSelectedPlacement(position);
+    onSubmitPlacement(position);
+  };
+
+  const handleVetoPlacementSelect = (position: number) => {
+    setSelectedPlacement(position);
+    onSubmitVetoPlacement(position);
+  };
+
+  // Get placement description for veto window
+  const getPlacementDescription = (): string => {
+    if (!currentRound.placement) return 'somewhere';
+    const pos = currentRound.placement.position;
+    const timeline = teams[currentRound.activeTeam].timeline;
+
+    if (timeline.length === 0) return 'on an empty timeline';
+    if (pos === 0) return `before ${timeline[0].year}`;
+    if (pos >= timeline.length) return `after ${timeline[timeline.length - 1].year}`;
+    return `between ${timeline[pos - 1].year} and ${timeline[pos].year}`;
+  };
 
   return (
     <Layout>
@@ -61,73 +106,102 @@ export function PlayingView({
           opponentTeamName={otherTeam.name}
         />
 
-        {/* Conditional Content */}
-        {canSubmitAnswer ? (
-          <>
-            {/* Ready Button - Show before answer form if not confirmed */}
-            {!confirmed && (
-              <div className="text-center space-y-6 mb-6">
-                {scanDetected ? (
-                  <div className="text-xl text-green-400 font-semibold animate-pulse">
-                    Scan detected! Starting soon...
-                  </div>
-                ) : (
-                  <>
-                    <div className="text-xl text-white">
-                      Scan the QR code on the TV to hear the song!
-                    </div>
-                    <button
-                      onClick={() => {
-                        onReady();
-                        setConfirmed(true);
-                      }}
-                      className="px-8 py-4 bg-green-500 hover:bg-green-600 text-white text-xl font-bold rounded-lg transition-colors"
-                    >
-                      Ready! I'm Listening
-                    </button>
-                    <div className="text-sm text-gray-400">
-                      (Tap when you've scanned and started the song)
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+        {/* Token Display */}
+        <div className="flex gap-4 text-lg">
+          <span className="text-yellow-400">Your Tokens: {myTeam.tokens}</span>
+        </div>
 
-            {/* Answer Form - Show after ready confirmation */}
-            {confirmed && (
+        {/* Phase-specific content */}
+        {phase === 'listening' && isMyTurn && (
+          <div className="text-center space-y-4">
+            {scanDetected ? (
+              <div className="text-xl text-green-400 font-semibold animate-pulse">
+                Scan detected! Starting quiz...
+              </div>
+            ) : (
               <>
-                <h2 className="text-2xl font-bold text-white text-center">
-                  Submit Your Answer
-                </h2>
-                <AnswerForm
-                  onSubmit={onSubmitAnswer}
-                  onTyping={onTyping}
-                />
+                <div className="text-xl text-white">
+                  Scan the QR code on the TV to hear the song!
+                </div>
+                <button
+                  onClick={onReady}
+                  className="px-8 py-4 bg-green-500 hover:bg-green-600 text-white text-xl font-bold rounded-lg transition-colors"
+                >
+                  Ready! I'm Listening
+                </button>
               </>
             )}
-          </>
-        ) : (
+          </div>
+        )}
+
+        {phase === 'quiz' && isMyTurn && currentRound.quizOptions && (
+          <QuizForm
+            artists={currentRound.quizOptions.artists}
+            songTitles={currentRound.quizOptions.songTitles}
+            onSubmit={onSubmitQuiz}
+            timeRemaining={timeRemaining}
+            disabled={!!currentRound.quizAnswer}
+          />
+        )}
+
+        {phase === 'placement' && isMyTurn && (
+          <TimelinePlacement
+            timeline={myTeam.timeline}
+            onSelectPosition={handlePlacementSelect}
+            selectedPosition={selectedPlacement}
+            timeRemaining={timeRemaining}
+            disabled={!!currentRound.placement}
+          />
+        )}
+
+        {phase === 'veto_window' && isVetoTeam && (
+          <VetoDecision
+            tokensAvailable={myTeam.tokens}
+            opponentPlacement={getPlacementDescription()}
+            onUseVeto={onUseVeto}
+            onPass={onPassVeto}
+            timeRemaining={timeRemaining}
+            disabled={!!currentRound.vetoDecision}
+          />
+        )}
+
+        {phase === 'veto_placement' && isVetoTeam && (
+          <TimelinePlacement
+            timeline={myTeam.timeline}
+            onSelectPosition={handleVetoPlacementSelect}
+            selectedPosition={selectedPlacement}
+            timeRemaining={timeRemaining}
+            disabled={!!currentRound.vetoPlacement}
+          />
+        )}
+
+        {/* Waiting states */}
+        {phase === 'listening' && !isMyTurn && (
+          <div className="text-xl text-gray-300">{otherTeam.name} is listening...</div>
+        )}
+
+        {phase === 'quiz' && !isMyTurn && (
+          <div className="text-xl text-gray-300">{otherTeam.name} is answering the quiz...</div>
+        )}
+
+        {phase === 'placement' && !isMyTurn && (
+          <div className="text-xl text-gray-300">{otherTeam.name} is placing the song...</div>
+        )}
+
+        {phase === 'veto_window' && !isVetoTeam && (
+          <div className="text-xl text-gray-300">Waiting for veto decision...</div>
+        )}
+
+        {phase === 'veto_placement' && !isVetoTeam && (
+          <div className="text-xl text-gray-300">Veto team is placing...</div>
+        )}
+
+        {phase === 'reveal' && (
           <div className="text-center space-y-4">
-            {phase === 'guessing' && isMyTurn && currentRound.currentAnswer && (
-              <div className="text-xl text-white">
-                Answer submitted! Waiting for reveal...
-              </div>
-            )}
-            {phase === 'guessing' && !isMyTurn && (
-              <div className="text-xl text-gray-300">
-                {otherTeam.name} is answering...
-              </div>
-            )}
-            {phase === 'reveal' && (
-              <div className="text-xl text-white">
-                Answer revealed!
-              </div>
-            )}
-            {phase === 'waiting' && (
-              <div className="text-xl text-gray-300">
-                Waiting for next round...
-              </div>
-            )}
+            <div className="text-2xl text-white">Round Complete!</div>
+            <div className="text-4xl font-bold text-yellow-400">{currentRound.song.title}</div>
+            <div className="text-2xl text-gray-300">{currentRound.song.artist}</div>
+            <div className="text-xl text-yellow-500">{currentRound.song.year}</div>
           </div>
         )}
 
@@ -135,12 +209,14 @@ export function PlayingView({
         <div className="flex gap-8 mt-8">
           <div className="text-center">
             <div className="text-lg text-gray-400">{myTeam.name}</div>
-            <div className="text-4xl font-bold text-white">{myTeam.score}</div>
+            <div className="text-4xl font-bold text-white">{myTeam.timeline.length}</div>
+            <div className="text-sm text-gray-500">songs</div>
           </div>
           <div className="text-2xl text-gray-500">-</div>
           <div className="text-center">
             <div className="text-lg text-gray-400">{otherTeam.name}</div>
-            <div className="text-4xl font-bold text-white">{otherTeam.score}</div>
+            <div className="text-4xl font-bold text-white">{otherTeam.timeline.length}</div>
+            <div className="text-sm text-gray-500">songs</div>
           </div>
         </div>
       </div>
