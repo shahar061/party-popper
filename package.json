@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "pnpm --parallel -r run dev",
     "dev:all": "bash scripts/dev.sh",
+    "dev:tunnels": "bash scripts/dev-tunnels.sh",
     "dev:host": "pnpm --filter @party-popper/host dev",
     "dev:player": "pnpm --filter @party-popper/player dev",
     "dev:backend": "pnpm --filter @party-popper/backend dev",

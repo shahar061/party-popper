@@ -10,7 +10,7 @@ import type { NewRoundPhase, QuizOptions, TimelineSong } from '@party-popper/sha
 interface JoinPayload {
   playerName: string;
   sessionId: string;
-  team?: 'A' | 'B';
+  team?: "A" | "B";
 }
 
 export interface GameEnv {
@@ -18,8 +18,8 @@ export interface GameEnv {
 }
 
 const VALID_TRANSITIONS: Record<GameStatus, GameStatus[]> = {
-  lobby: ['playing'],
-  playing: ['finished'],
+  lobby: ["playing"],
+  playing: ["finished"],
   finished: [],
 };
 
@@ -58,19 +58,20 @@ export class Game extends DurableObject {
 
   async initialize(joinCode: string, mode: GameMode): Promise<void> {
     // Load and shuffle songs for Classic mode
-    const songPool: Song[] = mode === 'classic'
-      ? shuffleArray((songsData as { songs: Song[] }).songs)
-      : [];
+    const songPool: Song[] =
+      mode === "classic"
+        ? shuffleArray((songsData as { songs: Song[] }).songs)
+        : [];
 
     this.state = {
       id: crypto.randomUUID(),
       joinCode,
-      status: 'lobby',
+      status: "lobby",
       mode,
       settings: { ...DEFAULT_SETTINGS },
       teams: {
-        A: createEmptyTeam('Team A'),
-        B: createEmptyTeam('Team B'),
+        A: createEmptyTeam("Team A"),
+        B: createEmptyTeam("Team B"),
       },
       currentRound: null,
       songPool,
@@ -84,21 +85,26 @@ export class Game extends DurableObject {
 
   getState(): GameState {
     if (!this.state) {
-      throw new Error('Game not initialized');
+      throw new Error("Game not initialized");
     }
     return this.state;
   }
 
-  async transitionTo(newStatus: GameStatus): Promise<{ success: boolean; error?: string }> {
+  async transitionTo(
+    newStatus: GameStatus
+  ): Promise<{ success: boolean; error?: string }> {
     if (!this.state) {
-      return { success: false, error: 'Game not initialized' };
+      return { success: false, error: "Game not initialized" };
     }
 
     const currentStatus = this.state.status;
     const validNextStates = VALID_TRANSITIONS[currentStatus];
 
     if (!validNextStates.includes(newStatus)) {
-      return { success: false, error: `Invalid state transition: ${currentStatus} -> ${newStatus}` };
+      return {
+        success: false,
+        error: `Invalid state transition: ${currentStatus} -> ${newStatus}`,
+      };
     }
 
     this.state.status = newStatus;
@@ -111,7 +117,7 @@ export class Game extends DurableObject {
   // Player management methods
   async handleJoin(payload: JoinPayload, ws: WebSocket): Promise<void> {
     if (!this.state) {
-      throw new Error('Game not initialized');
+      throw new Error("Game not initialized");
     }
 
     const { playerName, sessionId, team } = payload;
@@ -139,10 +145,16 @@ export class Game extends DurableObject {
 
     // Assign to team (check capacity)
     let targetTeam = player.team;
-    if (this.state.teams[targetTeam].players.length >= GAME_CONSTANTS.MAX_PLAYERS_PER_TEAM) {
+    if (
+      this.state.teams[targetTeam].players.length >=
+      GAME_CONSTANTS.MAX_PLAYERS_PER_TEAM
+    ) {
       // Team full, try other team
-      const otherTeam = targetTeam === 'A' ? 'B' : 'A';
-      if (this.state.teams[otherTeam].players.length < GAME_CONSTANTS.MAX_PLAYERS_PER_TEAM) {
+      const otherTeam = targetTeam === "A" ? "B" : "A";
+      if (
+        this.state.teams[otherTeam].players.length <
+        GAME_CONSTANTS.MAX_PLAYERS_PER_TEAM
+      ) {
         targetTeam = otherTeam;
         player.team = targetTeam;
       }
@@ -161,7 +173,7 @@ export class Game extends DurableObject {
     this.sendStateSync(ws, player);
 
     // Broadcast player joined to all other players
-    this.broadcast({ type: 'player_joined', payload: { player } }, ws);
+    this.broadcast({ type: "player_joined", payload: { player } }, ws);
   }
 
   async handleLeave(ws: WebSocket): Promise<void> {
@@ -171,9 +183,9 @@ export class Game extends DurableObject {
     if (!sessionId) return;
 
     // Remove player from team
-    for (const teamKey of ['A', 'B'] as const) {
+    for (const teamKey of ["A", "B"] as const) {
       const team = this.state.teams[teamKey];
-      const index = team.players.findIndex(p => p.sessionId === sessionId);
+      const index = team.players.findIndex((p) => p.sessionId === sessionId);
       if (index !== -1) {
         team.players.splice(index, 1);
         break;
@@ -208,7 +220,7 @@ export class Game extends DurableObject {
     ws: WebSocket
   ): Promise<{ success: boolean; playerName?: string; error?: string }> {
     if (!this.state) {
-      return { success: false, error: 'Game not initialized' };
+      return { success: false, error: "Game not initialized" };
     }
 
     const { sessionId } = payload;
@@ -217,13 +229,13 @@ export class Game extends DurableObject {
     const player = this.findPlayerBySession(sessionId);
 
     if (!player) {
-      return { success: false, error: 'Session not found' };
+      return { success: false, error: "Session not found" };
     }
 
     // Check if within reconnection window
     const timeSinceLastSeen = Date.now() - player.lastSeen;
     if (timeSinceLastSeen > RECONNECT_WINDOW_MS) {
-      return { success: false, error: 'Reconnection window expired' };
+      return { success: false, error: "Reconnection window expired" };
     }
 
     // Restore connection
@@ -244,8 +256,10 @@ export class Game extends DurableObject {
   findPlayerBySession(sessionId: string): Player | undefined {
     if (!this.state) return undefined;
 
-    for (const teamKey of ['A', 'B'] as const) {
-      const player = this.state.teams[teamKey].players.find(p => p.sessionId === sessionId);
+    for (const teamKey of ["A", "B"] as const) {
+      const player = this.state.teams[teamKey].players.find(
+        (p) => p.sessionId === sessionId
+      );
       if (player) return player;
     }
     return undefined;
@@ -254,23 +268,28 @@ export class Game extends DurableObject {
   findPlayerById(playerId: string): Player | undefined {
     if (!this.state) return undefined;
 
-    for (const teamKey of ['A', 'B'] as const) {
-      const player = this.state.teams[teamKey].players.find(p => p.id === playerId);
+    for (const teamKey of ["A", "B"] as const) {
+      const player = this.state.teams[teamKey].players.find(
+        (p) => p.id === playerId
+      );
       if (player) return player;
     }
     return undefined;
   }
 
-  async reassignTeam(playerId: string, newTeam: 'A' | 'B'): Promise<{ success: boolean; error?: string }> {
+  async reassignTeam(
+    playerId: string,
+    newTeam: "A" | "B"
+  ): Promise<{ success: boolean; error?: string }> {
     if (!this.state) {
-      return { success: false, error: 'Game not initialized' };
+      return { success: false, error: "Game not initialized" };
     }
 
     // Find and remove player from current team
     let player: Player | undefined;
-    for (const teamKey of ['A', 'B'] as const) {
+    for (const teamKey of ["A", "B"] as const) {
       const team = this.state.teams[teamKey];
-      const index = team.players.findIndex(p => p.id === playerId);
+      const index = team.players.findIndex((p) => p.id === playerId);
       if (index !== -1) {
         player = team.players[index];
         team.players.splice(index, 1);
@@ -279,14 +298,17 @@ export class Game extends DurableObject {
     }
 
     if (!player) {
-      return { success: false, error: 'Player not found' };
+      return { success: false, error: "Player not found" };
     }
 
     // Check if target team has capacity
-    if (this.state.teams[newTeam].players.length >= GAME_CONSTANTS.MAX_PLAYERS_PER_TEAM) {
+    if (
+      this.state.teams[newTeam].players.length >=
+      GAME_CONSTANTS.MAX_PLAYERS_PER_TEAM
+    ) {
       // Put player back
       this.state.teams[player.team].players.push(player);
-      return { success: false, error: 'Target team is full' };
+      return { success: false, error: "Target team is full" };
     }
 
     // Add to new team
@@ -306,45 +328,45 @@ export class Game extends DurableObject {
 
     // Broadcast to all clients that player is ready
     this.broadcast({
-      type: 'player_ready_notification',
+      type: "player_ready_notification",
       payload: {
         playerId,
         playerName: player.name,
-        readyAt: Date.now()
-      }
+        readyAt: Date.now(),
+      },
     });
   }
 
-  private getTeamWithFewerPlayers(): 'A' | 'B' {
-    if (!this.state) return 'A';
+  private getTeamWithFewerPlayers(): "A" | "B" {
+    if (!this.state) return "A";
 
     const teamACount = this.state.teams.A.players.length;
     const teamBCount = this.state.teams.B.players.length;
 
-    return teamACount <= teamBCount ? 'A' : 'B';
+    return teamACount <= teamBCount ? "A" : "B";
   }
 
   // Round management methods
   async startRound(): Promise<{ success: boolean; error?: string }> {
     if (!this.state) {
-      return { success: false, error: 'Game not initialized' };
+      return { success: false, error: "Game not initialized" };
     }
 
-    if (this.state.status !== 'playing') {
-      return { success: false, error: 'Game must be in playing state' };
+    if (this.state.status !== "playing") {
+      return { success: false, error: "Game must be in playing state" };
     }
 
     // Pick next song
     if (this.state.songPool.length === 0) {
-      return { success: false, error: 'No more songs available' };
+      return { success: false, error: "No more songs available" };
     }
 
     const song = this.state.songPool.shift()!;
     this.state.playedSongs.push(song);
 
     // Determine active team (alternate based on round number)
-    const roundNumber = (this.state.playedSongs.length);
-    const activeTeam: 'A' | 'B' = (roundNumber % 2 === 1) ? 'A' : 'B';
+    const roundNumber = this.state.playedSongs.length;
+    const activeTeam: "A" | "B" = roundNumber % 2 === 1 ? "A" : "B";
 
     // Create round
     const now = Date.now();
@@ -354,10 +376,10 @@ export class Game extends DurableObject {
       number: roundNumber,
       song,
       activeTeam,
-      phase: 'guessing',
+      phase: "guessing",
       startedAt: now,
       // Timer starts at a far future time - will be updated when QR code is scanned
-      endsAt: now + (365 * 24 * 60 * 60 * 1000), // 1 year in the future (effectively no countdown)
+      endsAt: now + 365 * 24 * 60 * 60 * 1000, // 1 year in the future (effectively no countdown)
       currentAnswer: null,
     };
 
@@ -367,29 +389,35 @@ export class Game extends DurableObject {
     return { success: true };
   }
 
-  async submitAnswer(answer: Answer): Promise<{ success: boolean; error?: string }> {
+  async submitAnswer(
+    answer: Answer
+  ): Promise<{ success: boolean; error?: string }> {
     if (!this.state || !this.state.currentRound) {
-      return { success: false, error: 'No active round' };
+      return { success: false, error: "No active round" };
     }
 
-    if (this.state.currentRound.phase !== 'guessing') {
-      return { success: false, error: 'Round is not in guessing phase' };
+    if (this.state.currentRound.phase !== "guessing") {
+      return { success: false, error: "Round is not in guessing phase" };
     }
 
     // Store answer
     this.state.currentRound.currentAnswer = answer;
 
     // Transition to reveal phase
-    this.state.currentRound.phase = 'reveal';
+    this.state.currentRound.phase = "reveal";
     this.state.lastActivityAt = Date.now();
     await this.persistState();
 
     return { success: true };
   }
 
-  async completeRound(): Promise<{ success: boolean; error?: string; gameFinished?: boolean }> {
+  async completeRound(): Promise<{
+    success: boolean;
+    error?: string;
+    gameFinished?: boolean;
+  }> {
     if (!this.state || !this.state.currentRound) {
-      return { success: false, error: 'No active round' };
+      return { success: false, error: "No active round" };
     }
 
     const round = this.state.currentRound;
@@ -398,8 +426,12 @@ export class Game extends DurableObject {
 
     // Calculate score (binary: all correct = 1 point, otherwise 0)
     if (answer) {
-      const artistCorrect = answer.artist.toLowerCase().trim() === round.song.artist.toLowerCase().trim();
-      const titleCorrect = answer.title.toLowerCase().trim() === round.song.title.toLowerCase().trim();
+      const artistCorrect =
+        answer.artist.toLowerCase().trim() ===
+        round.song.artist.toLowerCase().trim();
+      const titleCorrect =
+        answer.title.toLowerCase().trim() ===
+        round.song.title.toLowerCase().trim();
       const yearCorrect = answer.year === round.song.year;
 
       if (artistCorrect && titleCorrect && yearCorrect) {
@@ -418,11 +450,11 @@ export class Game extends DurableObject {
     const gameFinished = activeTeam.score >= this.state.settings.targetScore;
 
     if (gameFinished) {
-      this.state.status = 'finished';
+      this.state.status = "finished";
       this.state.currentRound = null;
     } else {
       // Transition to waiting phase
-      this.state.currentRound.phase = 'waiting';
+      this.state.currentRound.phase = "waiting";
     }
 
     this.state.lastActivityAt = Date.now();
@@ -789,7 +821,7 @@ export class Game extends DurableObject {
     if (!this.state) return;
 
     const message = {
-      type: 'state_sync',
+      type: "state_sync",
       payload: {
         gameState: this.state,
         playerId: player.id,
@@ -815,17 +847,21 @@ export class Game extends DurableObject {
 
   private sendToWs(ws: WebSocket, message: unknown, messageStr?: string): void {
     try {
-      if ((ws as any).readyState === 1) {
+      const readyState = (ws as any).readyState;
+      if (readyState === 1) {
         ws.send(messageStr || JSON.stringify(message));
+        console.log("[Game] Message sent to WebSocket");
+      } else {
+        console.log("[Game] WebSocket not ready, readyState:", readyState);
       }
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error("Failed to send message:", error);
     }
   }
 
   // Heartbeat methods
   async sendHeartbeat(): Promise<void> {
-    const pingMessage = JSON.stringify({ type: 'ping', payload: {} });
+    const pingMessage = JSON.stringify({ type: "ping", payload: {} });
 
     // Use ctx.getWebSockets() to get all active connections
     const allWebSockets = this.ctx.getWebSockets();
@@ -860,7 +896,7 @@ export class Game extends DurableObject {
       if (now - pingSentAt > PONG_TIMEOUT_MS) {
         // Close timed out connection
         try {
-          (ws as any).close(1000, 'Ping timeout');
+          (ws as any).close(1000, "Ping timeout");
         } catch {
           // Connection may already be closed
         }
@@ -893,12 +929,12 @@ export class Game extends DurableObject {
 
   private async persistState(): Promise<void> {
     if (this.state) {
-      await this.ctx.storage.put('gameState', this.state);
+      await this.ctx.storage.put("gameState", this.state);
     }
   }
 
   private async loadState(): Promise<void> {
-    const stored = await this.ctx.storage.get<GameState>('gameState');
+    const stored = await this.ctx.storage.get<GameState>("gameState");
     if (stored) {
       this.state = stored;
     }
@@ -913,37 +949,69 @@ export class Game extends DurableObject {
     const url = new URL(request.url);
 
     // Internal: Initialize game
-    if (url.pathname === '/initialize' && request.method === 'POST') {
-      const body = await request.json() as { joinCode: string; mode: 'classic' | 'custom' };
+    if (url.pathname === "/initialize" && request.method === "POST") {
+      const body = (await request.json()) as {
+        joinCode: string;
+        mode: "classic" | "custom";
+      };
       await this.initialize(body.joinCode, body.mode);
       return new Response(JSON.stringify({ success: true }), {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     // Internal: Get game info
-    if (url.pathname === '/info' && request.method === 'GET') {
+    if (url.pathname === "/info" && request.method === "GET") {
       if (!this.state) {
-        return new Response(JSON.stringify({ error: 'Game not found' }), { status: 404 });
+        return new Response(JSON.stringify({ error: "Game not found" }), {
+          status: 404,
+        });
       }
-      return new Response(JSON.stringify({
-        joinCode: this.state.joinCode,
-        status: this.state.status,
-        mode: this.state.mode,
-        playerCount: this.state.teams.A.players.length + this.state.teams.B.players.length,
-        teams: {
-          A: { name: this.state.teams.A.name, playerCount: this.state.teams.A.players.length },
-          B: { name: this.state.teams.B.name, playerCount: this.state.teams.B.players.length },
-        },
-      }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          joinCode: this.state.joinCode,
+          status: this.state.status,
+          mode: this.state.mode,
+          playerCount:
+            this.state.teams.A.players.length +
+            this.state.teams.B.players.length,
+          teams: {
+            A: {
+              name: this.state.teams.A.name,
+              playerCount: this.state.teams.A.players.length,
+            },
+            B: {
+              name: this.state.teams.B.name,
+              playerCount: this.state.teams.B.players.length,
+            },
+          },
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
     // Internal: Track QR scan
-    if (url.pathname === '/qr-scan' && request.method === 'POST') {
-      console.log('[Game] QR scan notification received');
-      const body = await request.json() as { scannedAt: number; userAgent?: string };
+    if (url.pathname === "/qr-scan" && request.method === "POST") {
+      console.log("[Game] QR scan notification received");
+      console.log("[Game] this.state exists:", !!this.state);
+      console.log(
+        "[Game] this.state.currentRound exists:",
+        !!this.state?.currentRound
+      );
+      console.log("[Game] this.state.status:", this.state?.status);
+      let body: { scannedAt: number; userAgent?: string };
+      try {
+        body = (await request.json()) as {
+          scannedAt: number;
+          userAgent?: string;
+        };
+        console.log("[Game] Body parsed:", body);
+      } catch (e) {
+        console.log("[Game] Body parse error:", e);
+        body = { scannedAt: Date.now() };
+      }
 
       // Start the round timer if not already started
       if (this.state && this.state.currentRound) {
@@ -951,12 +1019,21 @@ export class Game extends DurableObject {
         const roundDuration = this.state.settings.quizTimeSeconds * 1000;
         const currentEndsAt = this.state.currentRound.endsAt;
 
-        console.log('[Game] Current round timer endsAt:', new Date(currentEndsAt).toISOString());
-        console.log('[Game] Now + roundDuration * 2:', new Date(now + roundDuration * 2).toISOString());
+        console.log(
+          "[Game] Current round timer endsAt:",
+          new Date(currentEndsAt).toISOString()
+        );
+        console.log(
+          "[Game] Now + roundDuration * 2:",
+          new Date(now + roundDuration * 2).toISOString()
+        );
 
         // Only update if timer hasn't been started yet (check if it's in the far future)
         if (currentEndsAt > now + roundDuration * 2) {
-          console.log('[Game] Starting timer! New endsAt:', new Date(now + roundDuration).toISOString());
+          console.log(
+            "[Game] Starting timer! New endsAt:",
+            new Date(now + roundDuration).toISOString()
+          );
           this.state.currentRound.endsAt = now + roundDuration;
           await this.persistState();
 
@@ -964,51 +1041,69 @@ export class Game extends DurableObject {
           if (this.state.currentRound.phase === 'listening') {
             await this.transitionToPhase('quiz');
           }
+
+          // Broadcast state_sync so host gets the updated timer
+          this.broadcast({
+            type: "state_sync",
+            payload: { gameState: this.state },
+          });
         } else {
-          console.log('[Game] Timer already started, skipping update');
+          console.log("[Game] Timer already started, skipping update");
         }
       } else {
-        console.log('[Game] No current round, cannot start timer');
+        console.log("[Game] No current round, cannot start timer");
       }
 
       // Broadcast scan detection to all clients
-      console.log('[Game] Broadcasting scan detection to', this.connections.size, 'clients');
+      const allWs = this.ctx.getWebSockets();
+      console.log(
+        "[Game] Broadcasting scan detection to",
+        allWs.length,
+        "WebSockets (connections map:",
+        this.connections.size,
+        ")"
+      );
       this.broadcast({
-        type: 'qr_scan_detected',
+        type: "qr_scan_detected",
         payload: {
           scannedAt: body.scannedAt,
-          userAgent: body.userAgent
-        }
+          userAgent: body.userAgent,
+        },
       });
 
       return new Response(JSON.stringify({ success: true }), {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     // WebSocket upgrade
-    if (url.pathname === '/ws' || request.headers.get('Upgrade') === 'websocket') {
-      if (request.headers.get('Upgrade') !== 'websocket') {
-        return new Response('Expected WebSocket', { status: 426 });
+    if (
+      url.pathname === "/ws" ||
+      request.headers.get("Upgrade") === "websocket"
+    ) {
+      if (request.headers.get("Upgrade") !== "websocket") {
+        return new Response("Expected WebSocket", { status: 426 });
       }
 
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
       // Tag the WebSocket with its role - tags survive hibernation
-      const role = url.searchParams.get('role');
-      const tags = role === 'host' ? ['host'] : ['player'];
+      const role = url.searchParams.get("role");
+      const tags = role === "host" ? ["host"] : ["player"];
       this.ctx.acceptWebSocket(server, tags);
       this.connections.set(server, {});
 
       // For host connections, send state_sync immediately
-      if (role === 'host' && this.state) {
-        server.send(JSON.stringify({
-          type: 'state_sync',
-          payload: {
-            gameState: this.state,
-          },
-        }));
+      if (role === "host" && this.state) {
+        server.send(
+          JSON.stringify({
+            type: "state_sync",
+            payload: {
+              gameState: this.state,
+            },
+          })
+        );
       }
 
       return new Response(null, {
@@ -1017,7 +1112,7 @@ export class Game extends DurableObject {
       });
     }
 
-    return new Response('Not Found', { status: 404 });
+    return new Response("Not Found", { status: 404 });
   }
 
   async webSocketOpen(ws: WebSocket): Promise<void> {
@@ -1028,13 +1123,13 @@ export class Game extends DurableObject {
 
     // Check if this is a host connection using WebSocket tags (survive hibernation)
     const tags = this.ctx.getTags(ws);
-    const isHost = tags.includes('host');
+    const isHost = tags.includes("host");
 
     // If this is a host connection, send state sync
     // (Also sent in fetch handler, but this covers hibernation wake-up scenarios)
     if (isHost && this.state) {
       this.sendToWs(ws, {
-        type: 'state_sync',
+        type: "state_sync",
         payload: {
           gameState: this.state,
         },
@@ -1042,77 +1137,105 @@ export class Game extends DurableObject {
     }
   }
 
-  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+  async webSocketMessage(
+    ws: WebSocket,
+    message: string | ArrayBuffer
+  ): Promise<void> {
     // Load state if not already loaded (can happen after hibernation)
     if (!this.state) {
       await this.loadState();
     }
 
-    const data = typeof message === 'string' ? message : new TextDecoder().decode(message);
+    const data =
+      typeof message === "string" ? message : new TextDecoder().decode(message);
 
     try {
       const parsed = JSON.parse(data);
       const { type, payload } = parsed;
 
       switch (type) {
-        case 'join':
+        case "join":
           await this.handleJoin(payload, ws);
           break;
 
-        case 'reconnect':
+        case "reconnect":
           const result = await this.handleReconnect(payload, ws);
-          this.sendToWs(ws, { type: 'reconnect_result', payload: result });
+          this.sendToWs(ws, { type: "reconnect_result", payload: result });
           break;
 
-        case 'pong':
+        case "pong":
           this.handlePong(ws);
           break;
 
-        case 'reassign_team':
+        case "reassign_team":
           if (payload.playerId && payload.team) {
-            const reassignResult = await this.reassignTeam(payload.playerId, payload.team);
+            const reassignResult = await this.reassignTeam(
+              payload.playerId,
+              payload.team
+            );
             if (reassignResult.success) {
-              this.broadcast({ type: 'team_changed', payload: { playerId: payload.playerId, toTeam: payload.team } });
+              this.broadcast({
+                type: "team_changed",
+                payload: { playerId: payload.playerId, toTeam: payload.team },
+              });
             } else {
-              this.sendToWs(ws, { type: 'error', payload: { message: reassignResult.error } });
+              this.sendToWs(ws, {
+                type: "error",
+                payload: { message: reassignResult.error },
+              });
             }
           }
           break;
 
-        case 'update_settings':
+        case "update_settings":
           if (this.state && payload) {
             this.state.settings = { ...this.state.settings, ...payload };
             await this.persistState();
-            this.broadcast({ type: 'settings_updated', payload: { settings: this.state.settings } });
+            this.broadcast({
+              type: "settings_updated",
+              payload: { settings: this.state.settings },
+            });
           }
           break;
 
-        case 'start_game':
-          const transitionResult = await this.transitionTo('playing');
+        case "start_game":
+          const transitionResult = await this.transitionTo("playing");
           if (transitionResult.success) {
             const roundResult = await this.startQuizRound();
             if (roundResult.success) {
               this.broadcast({ type: 'game_started', payload: {} });
               this.broadcast({
-                type: 'state_sync',
-                payload: { gameState: this.state }
+                type: "state_sync",
+                payload: { gameState: this.state },
               });
             } else {
-              this.sendToWs(ws, { type: 'error', payload: { message: roundResult.error } });
+              this.sendToWs(ws, {
+                type: "error",
+                payload: { message: roundResult.error },
+              });
             }
           } else {
-            this.sendToWs(ws, { type: 'error', payload: { message: transitionResult.error } });
+            this.sendToWs(ws, {
+              type: "error",
+              payload: { message: transitionResult.error },
+            });
           }
           break;
 
-        case 'player_ready':
+        case "player_ready":
           if (payload && payload.playerId) {
             await this.handlePlayerReady(payload.playerId);
           }
           break;
 
-        case 'submit_answer':
-          if (payload && payload.artist && payload.title && payload.year !== undefined && payload.submittedBy) {
+        case "submit_answer":
+          if (
+            payload &&
+            payload.artist &&
+            payload.title &&
+            payload.year !== undefined &&
+            payload.submittedBy
+          ) {
             const answer: Answer = {
               artist: payload.artist,
               title: payload.title,
@@ -1125,14 +1248,20 @@ export class Game extends DurableObject {
             if (submitResult.success) {
               // Broadcast updated state with answer and reveal phase
               this.broadcast({
-                type: 'state_sync',
-                payload: { gameState: this.state }
+                type: "state_sync",
+                payload: { gameState: this.state },
               });
             } else {
-              this.sendToWs(ws, { type: 'error', payload: { message: submitResult.error } });
+              this.sendToWs(ws, {
+                type: "error",
+                payload: { message: submitResult.error },
+              });
             }
           } else {
-            this.sendToWs(ws, { type: 'error', payload: { message: 'Invalid answer format' } });
+            this.sendToWs(ws, {
+              type: "error",
+              payload: { message: "Invalid answer format" },
+            });
           }
           break;
 
@@ -1143,8 +1272,8 @@ export class Game extends DurableObject {
               const nextRoundResult = await this.startQuizRound();
               if (nextRoundResult.success) {
                 this.broadcast({
-                  type: 'state_sync',
-                  payload: { gameState: this.state }
+                  type: "state_sync",
+                  payload: { gameState: this.state },
                 });
               }
             }
@@ -1230,15 +1359,22 @@ export class Game extends DurableObject {
           break;
 
         default:
-          console.log('Unknown message type:', type);
+          console.log("Unknown message type:", type);
       }
     } catch (error) {
-      console.error('Error processing message:', error);
-      this.sendToWs(ws, { type: 'error', payload: { message: 'Invalid message format' } });
+      console.error("Error processing message:", error);
+      this.sendToWs(ws, {
+        type: "error",
+        payload: { message: "Invalid message format" },
+      });
     }
   }
 
-  async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
+  async webSocketClose(
+    ws: WebSocket,
+    code: number,
+    reason: string
+  ): Promise<void> {
     console.log(`WebSocket closed: ${code} ${reason}`);
 
     // Handle player disconnect
@@ -1252,8 +1388,8 @@ export class Game extends DurableObject {
 
         // Broadcast player_left to all other connections
         this.broadcast({
-          type: 'player_left',
-          payload: { playerId: player.id }
+          type: "player_left",
+          payload: { playerId: player.id },
         });
 
         await this.persistState();
@@ -1266,7 +1402,7 @@ export class Game extends DurableObject {
   }
 
   async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
-    console.error('WebSocket error:', error);
+    console.error("WebSocket error:", error);
     this.connections.delete(ws);
   }
 }

@@ -31,8 +31,9 @@ export function RoundDisplay({ round, teamName = 'Current Team', vetoTeamName, g
   // Cast phase to NewRoundPhase for type safety
   const phase = round.phase as NewRoundPhase;
 
-  // Timer hasn't started yet if endsAt is more than 2x the round duration
-  const timerStarted = remainingTime < (round.endsAt - round.startedAt) / 2;
+  // Timer hasn't started yet if endsAt is more than 5 minutes in the future
+  // (far future date indicates waiting for QR scan)
+  const timerStarted = round.endsAt - Date.now() < 5 * 60 * 1000;
 
   // Determine the veto team (opposite of active team)
   const vetoTeam = vetoTeamName || (round.activeTeam === 'A' ? 'Team B' : 'Team A');

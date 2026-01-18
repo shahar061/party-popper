@@ -33,6 +33,16 @@ export function PlayingView({
   const [selectedPlacement, setSelectedPlacement] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
 
+  // Auto-confirm when scan is detected (after the 2-second delay in App.tsx)
+  useEffect(() => {
+    if (scanDetected) {
+      const timer = setTimeout(() => {
+        setConfirmed(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [scanDetected]);
+
   // Find which team the player is on
   const playerTeam = teams.A.players.find(p => p.id === playerId) ? 'A' : 'B';
   const myTeam = teams[playerTeam];

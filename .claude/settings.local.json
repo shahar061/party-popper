@@ -48,7 +48,8 @@
       "Skill(superpowers:finishing-a-development-branch)",
       "Skill(superpowers:finishing-a-development-branch:*)",
       "Bash(git merge:*)",
-      "Bash(pnpm test:*)"
+      "Bash(pnpm test:*)",
+      "Bash(git branch:*)"
     ]
   }
 }
