@@ -86,18 +86,18 @@ export function GameplayScreen({ game, onNextRound }: GameplayScreenProps) {
           gameCode={game.joinCode}
         />
 
-        {/* Answer Display (only show in reveal phase) */}
-        {phase === 'reveal' && currentAnswer && (
+        {/* Answer Display (show in reveal phase) */}
+        {phase === 'reveal' && (
           <AnswerDisplay
             teamName={activeTeam.name}
-            artist={currentAnswer.artist}
-            title={currentAnswer.title}
-            year={currentAnswer.year}
+            artist={currentRound.song.artist}
+            title={currentRound.song.title}
+            year={currentRound.song.year}
           />
         )}
 
-        {/* Next Round Button (only show in waiting phase - legacy) */}
-        {phase === 'waiting' && (
+        {/* Next Round Button (show in reveal phase or legacy waiting phase) */}
+        {(phase === 'reveal' || phase === 'waiting') && (
           <button
             onClick={onNextRound}
             className="px-8 py-4 bg-game-primary hover:bg-game-primary-hover text-white text-2xl font-bold rounded-lg transition-colors"
