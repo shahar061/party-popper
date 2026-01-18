@@ -23,8 +23,10 @@ export type GameMode = 'classic' | 'custom';
 
 export interface GameSettings {
   targetScore: number;
-  roundTimeSeconds: number;
+  quizTimeSeconds: number;      // Was roundTimeSeconds
+  placementTimeSeconds: number;
   vetoWindowSeconds: number;
+  vetoPlacementSeconds: number;
 }
 
 export interface Team {
@@ -165,8 +167,10 @@ export interface VetoResult {
  */
 export const DEFAULT_SETTINGS: GameSettings = {
   targetScore: 10,
-  roundTimeSeconds: 60,
-  vetoWindowSeconds: 15,
+  quizTimeSeconds: 45,
+  placementTimeSeconds: 20,
+  vetoWindowSeconds: 10,
+  vetoPlacementSeconds: 15,
 };
 
 /**
@@ -175,7 +179,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
 export const GAME_CONSTANTS = {
   MAX_PLAYERS_PER_TEAM: 5,
   MIN_PLAYERS_PER_TEAM: 1,
-  INITIAL_VETO_TOKENS: 3,
-  RECONNECTION_WINDOW_MS: 5 * 60 * 1000, // 5 minutes
+  INITIAL_TOKENS: 0,  // Was INITIAL_VETO_TOKENS: 3
+  RECONNECTION_WINDOW_MS: 5 * 60 * 1000,
   JOIN_CODE_LENGTH: 4,
 } as const;
