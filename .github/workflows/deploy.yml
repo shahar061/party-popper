@@ -67,6 +67,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '3.114.0'
           command: pages deploy apps/host/dist --project-name=party-popper-host
 
   deploy-player:
@@ -100,4 +101,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '3.114.0'
           command: pages deploy apps/player/dist --project-name=party-popper-player
