@@ -159,4 +159,88 @@ describe('Team Leader', () => {
       expect(bob?.isTeamLeader).toBe(false);
     });
   });
+
+  describe('Teammate quiz suggestions', () => {
+    it('should store quiz suggestion and send to leader only', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'A' }, ws2);
+
+      await game.handleClaimTeamLeader('session-1'); // Alice is leader
+
+      // Clear previous send calls
+      ws1.send = vi.fn();
+      ws2.send = vi.fn();
+
+      // Bob submits a suggestion
+      const result = await game.handleQuizSuggestion('session-2', { artistIndex: 1, titleIndex: 2 });
+
+      expect(result.success).toBe(true);
+      // Leader (Alice) should receive the suggestion
+      expect(ws1.send).toHaveBeenCalledWith(
+        expect.stringContaining('"type":"teammate_quiz_vote"')
+      );
+      // Bob should NOT receive it (not broadcast)
+      expect(ws2.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Teammate placement suggestions', () => {
+    it('should store placement suggestion and send to leader only', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'A' }, ws2);
+
+      await game.handleClaimTeamLeader('session-1'); // Alice is leader
+
+      // Clear previous send calls
+      ws1.send = vi.fn();
+      ws2.send = vi.fn();
+
+      // Bob submits a placement suggestion
+      const result = await game.handlePlacementSuggestion('session-2', { position: 3 });
+
+      expect(result.success).toBe(true);
+      // Leader (Alice) should receive the suggestion
+      expect(ws1.send).toHaveBeenCalledWith(
+        expect.stringContaining('"type":"teammate_placement_vote"')
+      );
+      // Bob should NOT receive it
+      expect(ws2.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Teammate veto suggestions', () => {
+    it('should store veto suggestion and send to leader only', async () => {
+      const ws1 = createMockWebSocket();
+      const ws2 = createMockWebSocket();
+      mockCtx.getWebSockets.mockReturnValue([ws1, ws2]);
+
+      await game.handleJoin({ playerName: 'Alice', sessionId: 'session-1', team: 'A' }, ws1);
+      await game.handleJoin({ playerName: 'Bob', sessionId: 'session-2', team: 'A' }, ws2);
+
+      await game.handleClaimTeamLeader('session-1'); // Alice is leader
+
+      // Clear previous send calls
+      ws1.send = vi.fn();
+      ws2.send = vi.fn();
+
+      // Bob submits a veto suggestion
+      const result = await game.handleVetoSuggestion('session-2', { useVeto: true });
+
+      expect(result.success).toBe(true);
+      // Leader (Alice) should receive the suggestion
+      expect(ws1.send).toHaveBeenCalledWith(
+        expect.stringContaining('"type":"teammate_veto_vote"')
+      );
+      // Bob should NOT receive it
+      expect(ws2.send).not.toHaveBeenCalled();
+    });
+  });
 });

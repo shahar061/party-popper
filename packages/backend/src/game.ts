@@ -51,6 +51,9 @@ export class Game extends DurableObject {
   private wsToPlayer: Map<WebSocket, string> = new Map(); // ws -> sessionId
   private pendingPongs: Map<WebSocket, number> = new Map(); // ws -> ping sent timestamp
   private state: GameState | null = null;
+  private teammateQuizVotes: Map<string, { artistIndex: number | null; titleIndex: number | null }> = new Map();
+  private teammatePlacementVotes: Map<string, { position: number }> = new Map();
+  private teammateVetoVotes: Map<string, { useVeto: boolean }> = new Map();
 
   constructor(ctx: DurableObjectState, env: GameEnv) {
     super(ctx, env);
@@ -902,6 +905,116 @@ export class Game extends DurableObject {
     this.state.teams[team].timeline.sort((a, b) => a.year - b.year);
   }
 
+  // Teammate suggestion methods
+  async handleQuizSuggestion(
+    sessionId: string,
+    suggestion: { artistIndex: number | null; titleIndex: number | null }
+  ): Promise<{ success: boolean }> {
+    if (!this.state) return { success: false };
+
+    const player = this.findPlayerBySession(sessionId);
+    if (!player) return { success: false };
+
+    // Store the suggestion
+    this.teammateQuizVotes.set(sessionId, suggestion);
+
+    // Find team leader to send the suggestion to
+    const team = this.state.teams[player.team];
+    const leader = team.players.find(p => p.isTeamLeader && p.connected);
+
+    if (leader) {
+      // Find leader's WebSocket
+      for (const [ws, wsSessionId] of this.wsToPlayer.entries()) {
+        if (wsSessionId === leader.sessionId) {
+          this.sendToWs(ws, {
+            type: 'teammate_quiz_vote',
+            payload: {
+              playerId: player.id,
+              playerName: player.name,
+              artistIndex: suggestion.artistIndex,
+              titleIndex: suggestion.titleIndex,
+            },
+          });
+          break;
+        }
+      }
+    }
+
+    return { success: true };
+  }
+
+  async handlePlacementSuggestion(
+    sessionId: string,
+    suggestion: { position: number }
+  ): Promise<{ success: boolean }> {
+    if (!this.state) return { success: false };
+
+    const player = this.findPlayerBySession(sessionId);
+    if (!player) return { success: false };
+
+    // Store the suggestion
+    this.teammatePlacementVotes.set(sessionId, suggestion);
+
+    // Find team leader to send the suggestion to
+    const team = this.state.teams[player.team];
+    const leader = team.players.find(p => p.isTeamLeader && p.connected);
+
+    if (leader) {
+      // Find leader's WebSocket
+      for (const [ws, wsSessionId] of this.wsToPlayer.entries()) {
+        if (wsSessionId === leader.sessionId) {
+          this.sendToWs(ws, {
+            type: 'teammate_placement_vote',
+            payload: {
+              playerId: player.id,
+              playerName: player.name,
+              position: suggestion.position,
+            },
+          });
+          break;
+        }
+      }
+    }
+
+    return { success: true };
+  }
+
+  async handleVetoSuggestion(
+    sessionId: string,
+    suggestion: { useVeto: boolean }
+  ): Promise<{ success: boolean }> {
+    if (!this.state) return { success: false };
+
+    const player = this.findPlayerBySession(sessionId);
+    if (!player) return { success: false };
+
+    // Store the suggestion
+    this.teammateVetoVotes.set(sessionId, suggestion);
+
+    // Find team leader to send the suggestion to
+    const team = this.state.teams[player.team];
+    const leader = team.players.find(p => p.isTeamLeader && p.connected);
+
+    if (leader) {
+      // Find leader's WebSocket
+      for (const [ws, wsSessionId] of this.wsToPlayer.entries()) {
+        if (wsSessionId === leader.sessionId) {
+          this.sendToWs(ws, {
+            type: 'teammate_veto_vote',
+            payload: {
+              playerId: player.id,
+              playerName: player.name,
+              useVeto: suggestion.useVeto,
+            },
+          });
+          break;
+        }
+      }
+    }
+
+    return { success: true };
+  }
+
   // Broadcast methods
   private sendStateSync(ws: WebSocket, player: Player): void {
     if (!this.state) return;
@@ -1441,6 +1554,40 @@ export class Game extends DurableObject {
               if (!result.success) {
                 this.sendToWs(ws, { type: 'error', payload: { code: 'CLAIM_LEADER_ERROR', message: result.error } });
               }
+            }
+          }
+          break;
+
+        case 'submit_quiz_suggestion':
+          {
+            const sessionId = this.wsToPlayer.get(ws);
+            if (sessionId && payload) {
+              await this.handleQuizSuggestion(sessionId, {
+                artistIndex: payload.artistIndex ?? null,
+                titleIndex: payload.titleIndex ?? null,
+              });
+            }
+          }
+          break;
+
+        case 'submit_placement_suggestion':
+          {
+            const sessionId = this.wsToPlayer.get(ws);
+            if (sessionId && payload && payload.position !== undefined) {
+              await this.handlePlacementSuggestion(sessionId, {
+                position: payload.position,
+              });
+            }
+          }
+          break;
+
+        case 'submit_veto_suggestion':
+          {
+            const sessionId = this.wsToPlayer.get(ws);
+            if (sessionId && payload && payload.useVeto !== undefined) {
+              await this.handleVetoSuggestion(sessionId, {
+                useVeto: payload.useVeto,
+              });
             }
           }
           break;
