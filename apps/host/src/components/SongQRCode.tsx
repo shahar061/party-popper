@@ -11,9 +11,10 @@ export function SongQRCode({ spotifyUri, gameCode, size = 200 }: SongQRCodeProps
   // Falls back to API_URL for backwards compatibility
   const QR_BASE_URL = import.meta.env.VITE_QR_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
-  // TEMPORARY: Hardcoded URL for testing with playlist context
-  // TODO: Generate proper context URLs for each track based on spotifyUri
-  const spotifyUrl = 'https://open.spotify.com/track/6kUYTpPW0bEwn2qp2A4oCf?context=spotify:playlist:4pSchzZgV2gVZqSQVBMHzm&si=364b5c44225243e1';
+  // Convert spotify URI (spotify:track:XXX) to URL (https://open.spotify.com/track/XXX)
+  const spotifyUrl = spotifyUri.startsWith('spotify:track:')
+    ? `https://open.spotify.com/track/${spotifyUri.replace('spotify:track:', '')}`
+    : spotifyUri;
 
   // Generate tracking URL that redirects to Spotify
   const trackingUrl = `${QR_BASE_URL}/qr/track?code=${gameCode}&spotify=${encodeURIComponent(spotifyUrl)}`;
