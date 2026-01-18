@@ -8,13 +8,13 @@ describe('TiebreakerManager', () => {
 
   const createTeam = (score: number): Team => ({
     name: 'Test Team',
-    players: [{ id: 'p1', name: 'Player', connected: true, lastSeen: Date.now() }],
+    players: [{ id: 'p1', sessionId: 'sess1', name: 'Player', team: 'A', connected: true, lastSeen: Date.now() }],
     timeline: Array(score).fill({
-      song: { id: '1', title: 'Test', artist: 'Test', year: 2000, spotifyUri: '', spotifyUrl: '' },
+      id: '1', title: 'Test', artist: 'Test', year: 2000, spotifyUri: '', spotifyUrl: '',
       pointsEarned: 1,
       addedAt: Date.now()
     }),
-    vetoTokens: 3,
+    tokens: 0,
     score
   });
 

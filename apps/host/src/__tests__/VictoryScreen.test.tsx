@@ -5,8 +5,8 @@ import { VictoryScreen } from '../components/VictoryScreen';
 
 describe('VictoryScreen', () => {
   const mockTimeline = [
-    { song: { id: '1', title: 'Song 1', artist: 'Artist 1', year: 1985, spotifyUri: '', spotifyUrl: '' }, pointsEarned: 2, addedAt: Date.now() },
-    { song: { id: '2', title: 'Song 2', artist: 'Artist 2', year: 1990, spotifyUri: '', spotifyUrl: '' }, pointsEarned: 3, addedAt: Date.now() }
+    { id: '1', title: 'Song 1', artist: 'Artist 1', year: 1985, spotifyUri: '', spotifyUrl: '', pointsEarned: 2, addedAt: Date.now() },
+    { id: '2', title: 'Song 2', artist: 'Artist 2', year: 1990, spotifyUri: '', spotifyUrl: '', pointsEarned: 3, addedAt: Date.now() }
   ];
 
   it('should display winning team prominently', () => {

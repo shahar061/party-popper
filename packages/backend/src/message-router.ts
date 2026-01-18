@@ -9,7 +9,7 @@ export class MessageRouter {
 
   on<K extends ClientMessageType>(
     type: K,
-    handler: MessageHandler<Extract<ClientMessage, { type: K }>['payload']>
+    handler: MessageHandler<'payload' extends keyof Extract<ClientMessage, { type: K }> ? Extract<ClientMessage, { type: K }>['payload'] : undefined>
   ): void {
     this.handlers.set(type, handler as MessageHandler);
   }

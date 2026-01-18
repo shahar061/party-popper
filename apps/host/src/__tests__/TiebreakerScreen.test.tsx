@@ -17,6 +17,7 @@ describe('TiebreakerScreen', () => {
     render(
       <TiebreakerScreen
         song={mockSong}
+        gameCode="TEST"
         teamAName="Alpha"
         teamBName="Beta"
         teamASubmitted={false}
@@ -32,6 +33,7 @@ describe('TiebreakerScreen', () => {
     render(
       <TiebreakerScreen
         song={mockSong}
+        gameCode="TEST"
         teamAName="Alpha"
         teamBName="Beta"
         teamASubmitted={false}
@@ -48,6 +50,7 @@ describe('TiebreakerScreen', () => {
     render(
       <TiebreakerScreen
         song={mockSong}
+        gameCode="TEST"
         teamAName="Alpha"
         teamBName="Beta"
         teamASubmitted={true}
@@ -63,6 +66,7 @@ describe('TiebreakerScreen', () => {
     render(
       <TiebreakerScreen
         song={mockSong}
+        gameCode="TEST"
         teamAName="Alpha"
         teamBName="Beta"
         teamASubmitted={true}

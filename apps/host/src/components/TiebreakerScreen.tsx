@@ -4,6 +4,7 @@ import { SongQRCode } from './SongQRCode';
 
 interface TiebreakerScreenProps {
   song: Song;
+  gameCode: string;
   teamAName: string;
   teamBName: string;
   teamASubmitted: boolean;
@@ -13,6 +14,7 @@ interface TiebreakerScreenProps {
 
 export function TiebreakerScreen({
   song,
+  gameCode,
   teamAName,
   teamBName,
   teamASubmitted,
@@ -33,7 +35,7 @@ export function TiebreakerScreen({
       </div>
 
       <div className="flex justify-center mb-8">
-        <SongQRCode spotifyUri={song.spotifyUri} size={200} />
+        <SongQRCode spotifyUri={song.spotifyUri} gameCode={gameCode} size={200} />
       </div>
 
       <div className="grid grid-cols-2 gap-8 max-w-4xl mx-auto">

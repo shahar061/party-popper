@@ -32,6 +32,8 @@ describe('TimelineDisplay', () => {
         teamBTimeline={teamBTimeline}
         teamAName="Team Alpha"
         teamBName="Team Beta"
+        teamATokens={2}
+        teamBTokens={1}
       />
     );
 
@@ -46,6 +48,8 @@ describe('TimelineDisplay', () => {
         teamBTimeline={teamBTimeline}
         teamAName="Team A"
         teamBName="Team B"
+        teamATokens={0}
+        teamBTokens={0}
       />
     );
 
@@ -63,6 +67,8 @@ describe('TimelineDisplay', () => {
         teamBTimeline={teamBTimeline}
         teamAName="Team A"
         teamBName="Team B"
+        teamATokens={0}
+        teamBTokens={0}
       />
     );
 
@@ -78,6 +84,8 @@ describe('TimelineDisplay', () => {
         teamBTimeline={[]}
         teamAName="Team A"
         teamBName="Team B"
+        teamATokens={0}
+        teamBTokens={0}
       />
     );
 

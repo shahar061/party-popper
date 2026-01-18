@@ -9,7 +9,7 @@ const mockTeamA = {
     { id: '2', sessionId: 's2', name: 'Bob', team: 'A' as const, connected: true, lastSeen: Date.now() },
   ],
   timeline: [],
-  vetoTokens: 3,
+  tokens: 3,
   score: 0,
 };
 
@@ -19,7 +19,7 @@ const mockTeamB = {
     { id: '3', sessionId: 's3', name: 'Charlie', team: 'B' as const, connected: true, lastSeen: Date.now() },
   ],
   timeline: [],
-  vetoTokens: 3,
+  tokens: 3,
   score: 0,
 };
 

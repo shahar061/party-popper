@@ -4,12 +4,12 @@ import { JoinScreen } from './components/JoinScreen';
 import { LobbyView } from './components/LobbyView';
 import { PlayingView } from './components/PlayingView';
 import { ConnectionStatus } from './components/ConnectionStatus';
-import type { GameState, Player, SubmitAnswerMessage, PlayerReadyMessage } from '@party-popper/shared';
+import type { GameState, Player, PlayerReadyMessage } from '@party-popper/shared';
+import { ConnectionState } from '@party-popper/shared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
 type Screen = 'join' | 'lobby' | 'playing';
-type ConnectionState = 'disconnected' | 'connecting' | 'connected';
 
 interface PlayerState {
   playerId: string;
@@ -19,13 +19,13 @@ interface PlayerState {
 
 function App() {
   const [screen, setScreen] = useState<Screen>('join');
-  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [playerState, setPlayerState] = useState<PlayerState | null>(null);
   const [scanDetected, setScanDetected] = useState(false);
-  const autoReadyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoReadyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string>(
@@ -48,10 +48,10 @@ function App() {
       const ws = new WebSocket(`${wsProtocol}://${wsHost}/api/games/${code}/ws`);
 
       wsRef.current = ws;
-      setConnectionState('connecting');
+      setConnectionState(ConnectionState.Connecting);
 
       ws.onopen = () => {
-        setConnectionState('connected');
+        setConnectionState(ConnectionState.Connected);
         // Send join message
         ws.send(JSON.stringify({
           type: 'join',
@@ -161,7 +161,7 @@ function App() {
       };
 
       ws.onclose = () => {
-        setConnectionState('disconnected');
+        setConnectionState(ConnectionState.Disconnected);
         if (screen === 'join') {
           setError('Connection lost. Please try again.');
           setIsLoading(false);
@@ -171,7 +171,7 @@ function App() {
       ws.onerror = () => {
         setError('Failed to connect. Check the game code and try again.');
         setIsLoading(false);
-        setConnectionState('disconnected');
+        setConnectionState(ConnectionState.Disconnected);
       };
 
     } catch (err) {
@@ -179,28 +179,6 @@ function App() {
       setIsLoading(false);
     }
   }, [screen]);
-
-  // Handler for submitting answer
-  const handleSubmitAnswer = useCallback((data: { artist: string; title: string; year: number }) => {
-    if (!wsRef.current || !playerState) return;
-
-    const message: SubmitAnswerMessage = {
-      type: 'submit_answer',
-      payload: {
-        artist: data.artist,
-        title: data.title,
-        year: data.year,
-        submittedBy: playerState.playerId,
-      },
-    };
-
-    wsRef.current.send(JSON.stringify(message));
-  }, [playerState]);
-
-  // Handler for typing (not used in minimal v1, but required by AnswerForm)
-  const handleTyping = useCallback((_field: string, _value: string) => {
-    // No-op for minimal v1 - typing state not synced
-  }, []);
 
   // Handler for ready button
   const handleReady = useCallback(() => {
@@ -292,8 +270,6 @@ function App() {
         <PlayingView
           gameState={gameState}
           playerId={playerState.playerId}
-          onSubmitAnswer={handleSubmitAnswer}
-          onTyping={handleTyping}
           onReady={handleReady}
           scanDetected={scanDetected}
           onSubmitQuiz={handleSubmitQuiz}

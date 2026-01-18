@@ -85,10 +85,10 @@ export function VictoryScreen({
         <div className="bg-gray-800/80 rounded-xl p-6">
           <h3 className="text-xl font-bold text-blue-400 mb-4">{teamAName}'s Timeline</h3>
           <div className="space-y-2">
-            {teamATimeline.map((entry) => (
-              <div key={entry.song.id} className="flex justify-between text-gray-300">
-                <span>{entry.song.title}</span>
-                <span className="text-gray-500">{entry.song.year}</span>
+            {teamATimeline.map((song) => (
+              <div key={song.id} className="flex justify-between text-gray-300">
+                <span>{song.title}</span>
+                <span className="text-gray-500">{song.year}</span>
               </div>
             ))}
           </div>
@@ -96,10 +96,10 @@ export function VictoryScreen({
         <div className="bg-gray-800/80 rounded-xl p-6">
           <h3 className="text-xl font-bold text-orange-400 mb-4">{teamBName}'s Timeline</h3>
           <div className="space-y-2">
-            {teamBTimeline.map((entry) => (
-              <div key={entry.song.id} className="flex justify-between text-gray-300">
-                <span>{entry.song.title}</span>
-                <span className="text-gray-500">{entry.song.year}</span>
+            {teamBTimeline.map((song) => (
+              <div key={song.id} className="flex justify-between text-gray-300">
+                <span>{song.title}</span>
+                <span className="text-gray-500">{song.year}</span>
               </div>
             ))}
           </div>

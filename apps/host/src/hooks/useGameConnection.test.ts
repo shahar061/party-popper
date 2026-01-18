@@ -5,7 +5,12 @@ import { useGameConnection } from './useGameConnection';
 // Mock WebSocket
 class MockWebSocket {
   static instances: MockWebSocket[] = [];
-  readyState = WebSocket.CONNECTING;
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
+
+  readyState: number = 0; // CONNECTING
   onopen: (() => void) | null = null;
   onclose: ((event: { code: number }) => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
@@ -21,12 +26,12 @@ class MockWebSocket {
   close = vi.fn();
 
   simulateOpen() {
-    this.readyState = WebSocket.OPEN;
+    this.readyState = MockWebSocket.OPEN;
     this.onopen?.();
   }
 
   simulateClose(code = 1000) {
-    this.readyState = WebSocket.CLOSED;
+    this.readyState = MockWebSocket.CLOSED;
     this.onclose?.({ code });
   }
 

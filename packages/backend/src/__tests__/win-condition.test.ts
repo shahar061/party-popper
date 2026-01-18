@@ -21,7 +21,7 @@ describe('WinConditionChecker', () => {
     name: 'Test Team',
     players: [],
     timeline: Array(timelineLength).fill(null).map(() => createTimelineSong()),
-    vetoTokens: 3,
+    tokens: 0,
     score: timelineLength
   });
 
