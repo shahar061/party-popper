@@ -338,6 +338,42 @@ export class Game extends DurableObject {
     });
   }
 
+  async handleClaimTeamLeader(
+    sessionId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.state) {
+      return { success: false, error: 'Game not initialized' };
+    }
+
+    const player = this.findPlayerBySession(sessionId);
+    if (!player) {
+      return { success: false, error: 'Player not found' };
+    }
+
+    const team = this.state.teams[player.team];
+    const existingLeader = team.players.find(p => p.isTeamLeader);
+
+    if (existingLeader) {
+      return { success: false, error: 'Team already has a leader' };
+    }
+
+    // Set this player as leader
+    player.isTeamLeader = true;
+    await this.persistState();
+
+    // Broadcast to all clients
+    this.broadcast({
+      type: 'leader_claimed',
+      payload: {
+        team: player.team,
+        playerId: player.id,
+        playerName: player.name,
+      },
+    });
+
+    return { success: true };
+  }
+
   private getTeamWithFewerPlayers(): "A" | "B" {
     if (!this.state) return "A";
 
@@ -1354,6 +1390,18 @@ export class Game extends DurableObject {
               const result = await this.handleVetoPlacement(payload.position, player.id);
               if (!result.success) {
                 this.sendToWs(ws, { type: 'error', payload: { code: 'HANDLER_ERROR', message: 'Failed to submit veto placement' } });
+              }
+            }
+          }
+          break;
+
+        case 'claim_team_leader':
+          {
+            const sessionId = this.wsToPlayer.get(ws);
+            if (sessionId) {
+              const result = await this.handleClaimTeamLeader(sessionId);
+              if (!result.success) {
+                this.sendToWs(ws, { type: 'error', payload: { code: 'CLAIM_LEADER_ERROR', message: result.error } });
               }
             }
           }
