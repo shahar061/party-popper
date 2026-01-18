@@ -16,6 +16,8 @@ const createMockCtx = () => ({
     get: vi.fn().mockResolvedValue(null),
     put: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
+    setAlarm: vi.fn().mockResolvedValue(undefined),
+    deleteAlarm: vi.fn().mockResolvedValue(undefined),
   },
   getWebSockets: vi.fn().mockReturnValue([]),
   acceptWebSocket: vi.fn(),
