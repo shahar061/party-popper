@@ -42,3 +42,30 @@ describe('Game Durable Object', () => {
     expect(response.status).toBe(426);
   });
 });
+
+describe('Team Leader', () => {
+  it('should create players with isTeamLeader set to false', async () => {
+    const mockCtx = {
+      storage: {
+        get: vi.fn().mockResolvedValue(undefined),
+        put: vi.fn().mockResolvedValue(undefined),
+      },
+      getWebSockets: vi.fn().mockReturnValue([]),
+      acceptWebSocket: vi.fn(),
+    };
+    const mockEnv = {};
+
+    const game = new Game(mockCtx as any, mockEnv);
+    await game.initialize('TEST123', 'classic');
+
+    const mockWs = { send: vi.fn() };
+    await game.handleJoin(
+      { playerName: 'Alice', sessionId: 'session-1' },
+      mockWs as any
+    );
+
+    const state = game.getState();
+    const player = state?.teams.A.players[0] || state?.teams.B.players[0];
+    expect(player?.isTeamLeader).toBe(false);
+  });
+});

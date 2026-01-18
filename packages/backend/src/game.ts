@@ -141,6 +141,7 @@ export class Game extends DurableObject {
       team: team || this.getTeamWithFewerPlayers(),
       connected: true,
       lastSeen: Date.now(),
+      isTeamLeader: false,
     };
 
     // Assign to team (check capacity)
