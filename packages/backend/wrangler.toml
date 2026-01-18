@@ -14,8 +14,8 @@ new_classes = ["Game"]
 # KV namespace for join code -> game ID mapping
 [[kv_namespaces]]
 binding = "GAME_CODES"
-id = "PLACEHOLDER_KV_ID"
-preview_id = "PLACEHOLDER_PREVIEW_KV_ID"
+id = "8e7d31bc22864b7e83bf581deb8d0c41"
+preview_id = "0e78b4aa528b4dffa039b7e4f61a1b08"
 
 [dev]
 port = 8787
