@@ -151,6 +151,11 @@ function GameActionPanel({
   }>({ status: 'idle' });
   const phase = round.phase as NewRoundPhase | RoundPhase;
 
+  // Reset feedback state when round changes
+  useEffect(() => {
+    setFeedbackState({ status: 'idle' });
+  }, [round.number]);
+
   // Build QR URL for logging
   const QR_BASE_URL = import.meta.env.VITE_QR_BASE_URL || API_URL;
   const PLAYLIST_ID = '7KZdOsKtIGfE9YKiJjyM8I';
