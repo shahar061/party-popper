@@ -435,6 +435,9 @@ export class Game extends DurableObject {
       }
     }
 
+    // Add initial starter song to each team's timeline
+    await this.addInitialSongsToTimelines();
+
     // Transition to playing state
     const transitionResult = await this.transitionTo('playing');
     if (!transitionResult.success) {
@@ -463,6 +466,35 @@ export class Game extends DurableObject {
     const teamBCount = this.state.teams.B.players.length;
 
     return teamACount <= teamBCount ? "A" : "B";
+  }
+
+  /**
+   * Add one random starter song to each team's timeline.
+   * These songs are marked as initial and don't count towards score.
+   */
+  private async addInitialSongsToTimelines(): Promise<void> {
+    if (!this.state || this.state.songPool.length < 2) return;
+
+    const now = Date.now();
+
+    // Take one song for each team from the pool
+    for (const teamKey of ['A', 'B'] as const) {
+      const song = this.state.songPool.shift();
+      if (!song) continue;
+
+      const timelineSong: TimelineSong = {
+        ...song,
+        addedAt: now,
+        pointsEarned: 0,
+        isInitial: true,
+      };
+
+      this.state.teams[teamKey].timeline.push(timelineSong);
+      // Sort timeline by year
+      this.state.teams[teamKey].timeline.sort((a, b) => a.year - b.year);
+    }
+
+    await this.persistState();
   }
 
   // Round management methods
@@ -1110,8 +1142,9 @@ export class Game extends DurableObject {
       }
     }
 
-    this.state.teams.A.score = this.state.teams.A.timeline.length;
-    this.state.teams.B.score = this.state.teams.B.timeline.length;
+    // Score excludes initial starter songs
+    this.state.teams.A.score = this.state.teams.A.timeline.filter(s => !s.isInitial).length;
+    this.state.teams.B.score = this.state.teams.B.timeline.filter(s => !s.isInitial).length;
 
     const gameFinished =
       this.state.teams.A.score >= this.state.settings.targetScore ||

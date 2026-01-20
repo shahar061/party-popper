@@ -61,6 +61,7 @@ export interface Song {
 export interface TimelineSong extends Song {
   addedAt: number;
   pointsEarned: number;
+  isInitial?: boolean;  // True for starter songs that don't count towards score
 }
 
 export interface Round {
