@@ -2,20 +2,22 @@ import { ReactNode } from 'react';
 
 interface TVLayoutProps {
   children: ReactNode;
+  fullScreen?: boolean;
 }
 
 /**
  * TV-optimized layout wrapper that ensures:
- * - Safe area margins (5% on each side for TV overscan)
+ * - Safe area margins (reduced to 2% for more screen real estate)
  * - Minimum body text size of 24px (tv-sm)
  * - High contrast dark background with light text
  * - Readable from 3 meters distance
+ * - Full-screen mode with no scrolling when fullScreen=true
  */
-export function TVLayout({ children }: TVLayoutProps) {
+export function TVLayout({ children, fullScreen = false }: TVLayoutProps) {
   return (
-    <div className="min-h-screen bg-game-bg text-game-text font-body">
-      {/* TV safe area container - 5% margin for overscan */}
-      <div className="min-h-screen p-[5%]">
+    <div className={`${fullScreen ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-game-bg text-game-text font-body party-bg`}>
+      {/* TV safe area container - 2% margin for overscan */}
+      <div className={`${fullScreen ? 'h-full' : 'min-h-screen'} p-[2%]`}>
         {children}
       </div>
     </div>
