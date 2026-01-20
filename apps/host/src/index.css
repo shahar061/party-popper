@@ -18,6 +18,39 @@ body {
   .animate-slideOut {
     animation: slideOut 0.3s ease-in forwards;
   }
+
+  /* Party atmosphere animations */
+  .party-bg {
+    background: linear-gradient(135deg, #0f172a 0%, #1a1a2e 50%, #16213e 100%);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+  }
+
+  .pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  .pulse-glow-fast {
+    animation: pulseGlow 0.5s ease-in-out infinite;
+  }
+
+  .timer-urgent {
+    animation: timerUrgent 0.5s ease-in-out infinite;
+  }
+
+  .phase-indicator {
+    animation: phaseIndicator 1.5s ease-in-out infinite;
+  }
+
+  .song-chip {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium;
+    @apply bg-gray-700 text-white border border-gray-600;
+    @apply transition-all duration-200 hover:scale-105;
+  }
+
+  .song-chip-year {
+    @apply bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded text-xs font-bold;
+  }
 }
 
 @keyframes slideIn {
@@ -50,5 +83,46 @@ body {
   to {
     opacity: 0;
     transform: translateX(20px);
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+  }
+}
+
+@keyframes timerUrgent {
+  0%, 100% {
+    transform: scale(1);
+    color: #ef4444;
+  }
+  50% {
+    transform: scale(1.05);
+    color: #fbbf24;
+  }
+}
+
+@keyframes phaseIndicator {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
   }
 }

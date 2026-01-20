@@ -83,3 +83,77 @@ function TimelineColumn({ timeline, teamName, tokens, testId }: TimelineColumnPr
     </div>
   );
 }
+
+// Compact Timeline Panel for 3-column layout
+interface CompactTimelinePanelProps {
+  timeline: TimelineSong[];
+  teamName: string;
+  tokens: number;
+  score: number;
+  isActive: boolean;
+  testId: string;
+}
+
+export function CompactTimelinePanel({
+  timeline,
+  teamName,
+  tokens,
+  score,
+  isActive,
+  testId
+}: CompactTimelinePanelProps) {
+  return (
+    <div
+      data-testid={testId}
+      className={`
+        h-full flex flex-col bg-gray-800/80 rounded-xl p-3
+        border-2 transition-all duration-300
+        ${isActive ? 'border-yellow-400 pulse-glow' : 'border-gray-700'}
+      `}
+    >
+      {/* Header with team name and score */}
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          {isActive && <span className="text-yellow-400 animate-bounce">▸</span>}
+          {teamName}
+        </h3>
+        <div className="flex items-center gap-2">
+          {/* Tokens */}
+          <div className="flex items-center gap-0.5">
+            {Array.from({ length: Math.min(tokens, 5) }).map((_, i) => (
+              <span key={i} className="text-yellow-400 text-sm">★</span>
+            ))}
+            {tokens > 5 && <span className="text-yellow-400 text-xs">+{tokens - 5}</span>}
+          </div>
+          {/* Score */}
+          <span className="text-2xl font-bold text-white bg-gray-700 px-2 py-0.5 rounded">
+            {score}
+          </span>
+        </div>
+      </div>
+
+      {/* Timeline as horizontal chips */}
+      <div className="flex-1 overflow-y-auto">
+        {timeline.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <p className="text-gray-500 text-sm">No songs yet</p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5 content-start">
+            {timeline.map((entry) => (
+              <div
+                key={entry.id}
+                data-testid="timeline-song"
+                className="song-chip"
+                title={`${entry.title} - ${entry.artist}`}
+              >
+                <span className="song-chip-year">{entry.year}</span>
+                <span className="truncate max-w-[100px]">{entry.title}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
