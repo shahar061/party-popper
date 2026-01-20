@@ -242,7 +242,7 @@ function App() {
   const handleSubmitQuiz = useCallback((artistIndex: number, titleIndex: number) => {
     wsRef.current?.send(JSON.stringify({
       type: 'submit_quiz',
-      payload: { artistIndex, titleIndex }
+      payload: { artistIndex, titleIndex, sessionId: sessionIdRef.current }
     }));
   }, []);
 
@@ -250,38 +250,47 @@ function App() {
   const handleSubmitPlacement = useCallback((position: number) => {
     wsRef.current?.send(JSON.stringify({
       type: 'submit_placement',
-      payload: { position }
+      payload: { position, sessionId: sessionIdRef.current }
     }));
   }, []);
 
   // Handler for using veto
   const handleUseVeto = useCallback(() => {
-    wsRef.current?.send(JSON.stringify({ type: 'use_veto' }));
+    wsRef.current?.send(JSON.stringify({
+      type: 'use_veto',
+      payload: { sessionId: sessionIdRef.current }
+    }));
   }, []);
 
   // Handler for passing on veto
   const handlePassVeto = useCallback(() => {
-    wsRef.current?.send(JSON.stringify({ type: 'pass_veto' }));
+    wsRef.current?.send(JSON.stringify({
+      type: 'pass_veto',
+      payload: { sessionId: sessionIdRef.current }
+    }));
   }, []);
 
   // Handler for veto placement submission
   const handleSubmitVetoPlacement = useCallback((position: number) => {
     wsRef.current?.send(JSON.stringify({
       type: 'submit_veto_placement',
-      payload: { position }
+      payload: { position, sessionId: sessionIdRef.current }
     }));
   }, []);
 
   // Handler for claiming team leader
   const handleClaimLeader = useCallback(() => {
-    wsRef.current?.send(JSON.stringify({ type: 'claim_team_leader' }));
+    wsRef.current?.send(JSON.stringify({
+      type: 'claim_team_leader',
+      payload: { sessionId: sessionIdRef.current }
+    }));
   }, []);
 
   // Handler for quiz suggestion (non-leaders)
   const handleQuizSuggestion = useCallback((artistIndex: number | null, titleIndex: number | null) => {
     wsRef.current?.send(JSON.stringify({
       type: 'submit_quiz_suggestion',
-      payload: { artistIndex, titleIndex }
+      payload: { artistIndex, titleIndex, sessionId: sessionIdRef.current }
     }));
   }, []);
 
@@ -289,7 +298,7 @@ function App() {
   const handlePlacementSuggestion = useCallback((position: number) => {
     wsRef.current?.send(JSON.stringify({
       type: 'submit_placement_suggestion',
-      payload: { position }
+      payload: { position, sessionId: sessionIdRef.current }
     }));
   }, []);
 
@@ -297,7 +306,7 @@ function App() {
   const handleVetoSuggestion = useCallback((useVeto: boolean) => {
     wsRef.current?.send(JSON.stringify({
       type: 'submit_veto_suggestion',
-      payload: { useVeto }
+      payload: { useVeto, sessionId: sessionIdRef.current }
     }));
   }, []);
 

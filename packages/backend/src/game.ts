@@ -1720,7 +1720,10 @@ export class Game extends DurableObject {
 
         case 'submit_quiz':
           if (payload && payload.artistIndex !== undefined && payload.titleIndex !== undefined) {
-            const sessionId = this.wsToPlayer.get(ws);
+            const sessionId = payload.sessionId || this.wsToPlayer.get(ws);
+            if (sessionId && !this.wsToPlayer.has(ws)) {
+              this.wsToPlayer.set(ws, sessionId);
+            }
             const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
             if (player) {
               const result = await this.handleSubmitQuiz(payload.artistIndex, payload.titleIndex, player.id);
@@ -1733,7 +1736,10 @@ export class Game extends DurableObject {
 
         case 'submit_placement':
           if (payload && payload.position !== undefined) {
-            const sessionId = this.wsToPlayer.get(ws);
+            const sessionId = payload.sessionId || this.wsToPlayer.get(ws);
+            if (sessionId && !this.wsToPlayer.has(ws)) {
+              this.wsToPlayer.set(ws, sessionId);
+            }
             const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
             if (player) {
               const result = await this.handleSubmitPlacement(payload.position, player.id);
@@ -1746,7 +1752,10 @@ export class Game extends DurableObject {
 
         case 'use_veto':
           {
-            const sessionId = this.wsToPlayer.get(ws);
+            const sessionId = payload?.sessionId || this.wsToPlayer.get(ws);
+            if (sessionId && !this.wsToPlayer.has(ws)) {
+              this.wsToPlayer.set(ws, sessionId);
+            }
             const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
             if (player) {
               const result = await this.handleVetoDecision(true, player.id);
@@ -1759,7 +1768,10 @@ export class Game extends DurableObject {
 
         case 'pass_veto':
           {
-            const sessionId = this.wsToPlayer.get(ws);
+            const sessionId = payload?.sessionId || this.wsToPlayer.get(ws);
+            if (sessionId && !this.wsToPlayer.has(ws)) {
+              this.wsToPlayer.set(ws, sessionId);
+            }
             const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
             if (player) {
               const result = await this.handleVetoDecision(false, player.id);
@@ -1772,7 +1784,10 @@ export class Game extends DurableObject {
 
         case 'submit_veto_placement':
           if (payload && payload.position !== undefined) {
-            const sessionId = this.wsToPlayer.get(ws);
+            const sessionId = payload.sessionId || this.wsToPlayer.get(ws);
+            if (sessionId && !this.wsToPlayer.has(ws)) {
+              this.wsToPlayer.set(ws, sessionId);
+            }
             const player = sessionId ? this.findPlayerBySession(sessionId) : undefined;
             if (player) {
               const result = await this.handleVetoPlacement(payload.position, player.id);
@@ -1785,19 +1800,29 @@ export class Game extends DurableObject {
 
         case 'claim_team_leader':
           {
-            const sessionId = this.wsToPlayer.get(ws);
+            // Get sessionId from payload (survives hibernation) or fall back to wsToPlayer map
+            const sessionId = payload?.sessionId || this.wsToPlayer.get(ws);
             if (sessionId) {
+              // Re-establish mapping if it was lost due to hibernation
+              if (!this.wsToPlayer.has(ws)) {
+                this.wsToPlayer.set(ws, sessionId);
+              }
               const result = await this.handleClaimTeamLeader(sessionId);
               if (!result.success) {
                 this.sendToWs(ws, { type: 'error', payload: { code: 'CLAIM_LEADER_ERROR', message: result.error } });
               }
+            } else {
+              this.sendToWs(ws, { type: 'error', payload: { code: 'SESSION_NOT_FOUND', message: 'Session not found. Please rejoin the game.' } });
             }
           }
           break;
 
         case 'submit_quiz_suggestion':
           {
-            const sessionId = this.wsToPlayer.get(ws);
+            const sessionId = payload?.sessionId || this.wsToPlayer.get(ws);
+            if (sessionId && !this.wsToPlayer.has(ws)) {
+              this.wsToPlayer.set(ws, sessionId);
+            }
             if (sessionId && payload) {
               await this.handleQuizSuggestion(sessionId, {
                 artistIndex: payload.artistIndex ?? null,
@@ -1809,7 +1834,10 @@ export class Game extends DurableObject {
 
         case 'submit_placement_suggestion':
           {
-            const sessionId = this.wsToPlayer.get(ws);
+            const sessionId = payload?.sessionId || this.wsToPlayer.get(ws);
+            if (sessionId && !this.wsToPlayer.has(ws)) {
+              this.wsToPlayer.set(ws, sessionId);
+            }
             if (sessionId && payload && payload.position !== undefined) {
               await this.handlePlacementSuggestion(sessionId, {
                 position: payload.position,
@@ -1820,7 +1848,10 @@ export class Game extends DurableObject {
 
         case 'submit_veto_suggestion':
           {
-            const sessionId = this.wsToPlayer.get(ws);
+            const sessionId = payload?.sessionId || this.wsToPlayer.get(ws);
+            if (sessionId && !this.wsToPlayer.has(ws)) {
+              this.wsToPlayer.set(ws, sessionId);
+            }
             if (sessionId && payload && payload.useVeto !== undefined) {
               await this.handleVetoSuggestion(sessionId, {
                 useVeto: payload.useVeto,
