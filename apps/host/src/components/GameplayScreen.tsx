@@ -95,7 +95,10 @@ function GameActionPanel({
   placement,
 }: GameActionPanelProps) {
   const [remainingTime, setRemainingTime] = useState<number>(0);
-  const [logStatus, setLogStatus] = useState<'idle' | 'logging' | 'success' | 'error'>('idle');
+  const [feedbackState, setFeedbackState] = useState<{
+    status: 'idle' | 'logging' | 'submitted';
+    message?: string;
+  }>({ status: 'idle' });
   const phase = round.phase as NewRoundPhase | RoundPhase;
 
   // Build QR URL for logging
@@ -108,7 +111,7 @@ function GameActionPanel({
   const qrCodeUrl = `${QR_BASE_URL}/qr/track?code=${gameCode}&spotify=${encodeURIComponent(spotifyUrl)}`;
 
   const logQrUrl = async (type: 'success' | 'failed') => {
-    setLogStatus('logging');
+    setFeedbackState({ status: 'logging' });
     try {
       await fetch(`${API_URL}/api/qr-log/${type}`, {
         method: 'POST',
@@ -119,12 +122,47 @@ function GameActionPanel({
           gameCode,
         }),
       });
-      setLogStatus('success');
-      setTimeout(() => setLogStatus('idle'), 2000);
+      const message = type === 'success' ? 'Thanks! QR marked as working' : 'Thanks! QR issue logged';
+      setFeedbackState({ status: 'submitted', message });
     } catch {
-      setLogStatus('error');
-      setTimeout(() => setLogStatus('idle'), 2000);
+      setFeedbackState({ status: 'submitted', message: 'Feedback saved locally' });
     }
+  };
+
+  // QR Feedback Panel component
+  const QrFeedbackPanel = () => {
+    if (feedbackState.status === 'submitted') {
+      return (
+        <div className="flex items-center gap-2 px-4 py-2 bg-green-600/20 border border-green-500 rounded-lg animate-slideIn">
+          <span className="text-green-400">✓</span>
+          <span className="text-sm text-green-300">{feedbackState.message}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex gap-2">
+          <button
+            onClick={() => logQrUrl('success')}
+            disabled={feedbackState.status === 'logging'}
+            className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white rounded transition-colors"
+          >
+            {feedbackState.status === 'logging' ? '...' : 'QR Worked'}
+          </button>
+          <button
+            onClick={() => logQrUrl('failed')}
+            disabled={feedbackState.status === 'logging'}
+            className="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 disabled:bg-gray-500 text-white rounded transition-colors"
+          >
+            {feedbackState.status === 'logging' ? '...' : 'QR Failed'}
+          </button>
+        </div>
+        <div className="text-xs text-gray-500">
+          {round.song.artist} - {round.song.title}
+        </div>
+      </div>
+    );
   };
 
   useEffect(() => {
@@ -195,26 +233,7 @@ function GameActionPanel({
               {activeTeamName}'s Turn
             </div>
             <SongQRCode spotifyUri={round.song.spotifyUri} gameCode={gameCode} size={200} />
-            {/* QR Debug Buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => logQrUrl('success')}
-                disabled={logStatus === 'logging'}
-                className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white rounded transition-colors"
-              >
-                {logStatus === 'logging' ? '...' : logStatus === 'success' ? '✓' : 'Works'}
-              </button>
-              <button
-                onClick={() => logQrUrl('failed')}
-                disabled={logStatus === 'logging'}
-                className="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 disabled:bg-gray-500 text-white rounded transition-colors"
-              >
-                {logStatus === 'logging' ? '...' : logStatus === 'success' ? '✓' : "Doesn't Work"}
-              </button>
-            </div>
-            <div className="text-xs text-gray-500">
-              {round.song.artist} - {round.song.title}
-            </div>
+            <QrFeedbackPanel />
             <div
               data-testid="round-timer"
               className="text-5xl font-mono font-bold text-white"
@@ -238,26 +257,7 @@ function GameActionPanel({
             <div className="text-lg text-gray-300">
               Answer the quiz on your device
             </div>
-            {/* QR Debug Buttons - also shown in quiz phase for broken link reporting */}
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={() => logQrUrl('success')}
-                disabled={logStatus === 'logging'}
-                className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white rounded transition-colors"
-              >
-                {logStatus === 'logging' ? '...' : logStatus === 'success' ? '✓' : 'QR Worked'}
-              </button>
-              <button
-                onClick={() => logQrUrl('failed')}
-                disabled={logStatus === 'logging'}
-                className="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 disabled:bg-gray-500 text-white rounded transition-colors"
-              >
-                {logStatus === 'logging' ? '...' : logStatus === 'success' ? '✓' : 'QR Failed'}
-              </button>
-            </div>
-            <div className="text-xs text-gray-500">
-              {round.song.artist} - {round.song.title}
-            </div>
+            <QrFeedbackPanel />
           </>
         )}
 
