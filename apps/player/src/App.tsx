@@ -142,6 +142,25 @@ function App() {
               setScreen('playing');
               break;
             }
+            case 'leader_claimed': {
+              const { team, playerId } = message.payload as { team: 'A' | 'B'; playerId: string };
+              setGameState(prev => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  teams: {
+                    ...prev.teams,
+                    [team]: {
+                      ...prev.teams[team],
+                      players: prev.teams[team].players.map((p: Player) =>
+                        p.id === playerId ? { ...p, isTeamLeader: true } : p
+                      ),
+                    },
+                  },
+                };
+              });
+              break;
+            }
             case 'qr_scan_detected': {
               setScanDetected(true);
               // Auto-ready after 2 seconds - timer has started!

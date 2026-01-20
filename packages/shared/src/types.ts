@@ -27,6 +27,7 @@ export interface GameSettings {
   placementTimeSeconds: number;
   vetoWindowSeconds: number;
   vetoPlacementSeconds: number;
+  revealTimeSeconds: number;    // Auto-advance to next round after reveal
 }
 
 export interface Team {
@@ -54,6 +55,7 @@ export interface Song {
   year: number;
   spotifyUri: string;
   spotifyUrl: string;
+  deeplink: string;
 }
 
 export interface TimelineSong extends Song {
@@ -172,6 +174,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   placementTimeSeconds: 20,
   vetoWindowSeconds: 10,
   vetoPlacementSeconds: 15,
+  revealTimeSeconds: 5,
 };
 
 /**

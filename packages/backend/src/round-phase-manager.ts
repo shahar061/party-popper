@@ -6,7 +6,7 @@ export const PHASE_DURATIONS = {
   placement: 'placementTimeSeconds',
   veto_window: 'vetoWindowSeconds',
   veto_placement: 'vetoPlacementSeconds',
-  reveal: 0,  // No timer - host advances
+  reveal: 'revealTimeSeconds',  // Auto-advance to next round
 } as const;
 
 export class RoundPhaseManager {
@@ -51,6 +51,8 @@ export class RoundPhaseManager {
         return settings.vetoWindowSeconds * 1000;
       case 'veto_placement':
         return settings.vetoPlacementSeconds * 1000;
+      case 'reveal':
+        return settings.revealTimeSeconds * 1000;
       default:
         return 0;
     }

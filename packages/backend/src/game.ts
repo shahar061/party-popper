@@ -630,6 +630,12 @@ export class Game extends DurableObject {
         endsAt: this.state.currentRound.endsAt,
       },
     });
+
+    // Also broadcast state_sync so host app gets updated
+    this.broadcast({
+      type: 'state_sync',
+      payload: { gameState: this.state },
+    });
   }
 
   /**
@@ -659,8 +665,11 @@ export class Game extends DurableObject {
       case 'veto_placement':
         await this.handleVetoPlacementTimeout();
         break;
+      case 'reveal':
+        await this.handleRevealTimeout();
+        break;
       default:
-        // No timeout handling for listening or reveal phases
+        // No timeout handling for listening phase
         break;
     }
   }
@@ -788,6 +797,30 @@ export class Game extends DurableObject {
     await this.persistState();
 
     await this.transitionToPhase('reveal');
+  }
+
+  /**
+   * Reveal timeout: Auto-advance to next round
+   */
+  private async handleRevealTimeout(): Promise<void> {
+    if (!this.state || !this.state.currentRound) return;
+    if (this.state.currentRound.phase !== 'reveal') return;
+
+    console.log('[Game] Reveal timeout - auto-advancing to next round');
+
+    // Resolve the current round
+    const resolveResult = await this.resolveRound();
+
+    if (resolveResult.success && !resolveResult.gameFinished) {
+      // Start the next round
+      const nextRoundResult = await this.startQuizRound();
+      if (nextRoundResult.success) {
+        this.broadcast({
+          type: 'state_sync',
+          payload: { gameState: this.state },
+        });
+      }
+    }
   }
 
   async handleSubmitQuiz(

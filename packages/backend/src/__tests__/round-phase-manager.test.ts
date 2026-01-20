@@ -9,6 +9,7 @@ describe('RoundPhaseManager', () => {
     placementTimeSeconds: 20,
     vetoWindowSeconds: 10,
     vetoPlacementSeconds: 15,
+    revealTimeSeconds: 5,
   };
 
   describe('getNextPhase', () => {
@@ -62,8 +63,8 @@ describe('RoundPhaseManager', () => {
       expect(RoundPhaseManager.getPhaseDuration('listening', settings)).toBe(0);
     });
 
-    it('returns 0 for reveal phase', () => {
-      expect(RoundPhaseManager.getPhaseDuration('reveal', settings)).toBe(0);
+    it('returns correct reveal duration', () => {
+      expect(RoundPhaseManager.getPhaseDuration('reveal', settings)).toBe(5000);
     });
   });
 });
