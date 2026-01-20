@@ -238,6 +238,26 @@ function GameActionPanel({
             <div className="text-lg text-gray-300">
               Answer the quiz on your device
             </div>
+            {/* QR Debug Buttons - also shown in quiz phase for broken link reporting */}
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => logQrUrl('success')}
+                disabled={logStatus === 'logging'}
+                className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white rounded transition-colors"
+              >
+                {logStatus === 'logging' ? '...' : logStatus === 'success' ? '✓' : 'QR Worked'}
+              </button>
+              <button
+                onClick={() => logQrUrl('failed')}
+                disabled={logStatus === 'logging'}
+                className="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 disabled:bg-gray-500 text-white rounded transition-colors"
+              >
+                {logStatus === 'logging' ? '...' : logStatus === 'success' ? '✓' : 'QR Failed'}
+              </button>
+            </div>
+            <div className="text-xs text-gray-500">
+              {round.song.artist} - {round.song.title}
+            </div>
           </>
         )}
 
