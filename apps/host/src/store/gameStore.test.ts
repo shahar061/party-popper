@@ -18,7 +18,7 @@ describe('gameStore', () => {
       joinCode: 'ABCD',
       status: 'lobby',
       mode: 'classic',
-      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15 },
+      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15, revealTimeSeconds: 5 },
       teams: {
         A: { name: 'Team A', players: [], timeline: [], tokens: 3, score: 0 },
         B: { name: 'Team B', players: [], timeline: [], tokens: 3, score: 0 },
@@ -41,7 +41,7 @@ describe('gameStore', () => {
       joinCode: 'ABCD',
       status: 'lobby',
       mode: 'classic',
-      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15 },
+      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15, revealTimeSeconds: 5 },
       teams: {
         A: { name: 'Team A', players: [], timeline: [], tokens: 3, score: 0 },
         B: { name: 'Team B', players: [], timeline: [], tokens: 3, score: 0 },
@@ -68,7 +68,7 @@ describe('gameStore', () => {
       joinCode: 'ABCD',
       status: 'lobby',
       mode: 'classic',
-      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15 },
+      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15, revealTimeSeconds: 5 },
       teams: {
         A: { name: 'Team A', players: [player], timeline: [], tokens: 3, score: 0 },
         B: { name: 'Team B', players: [], timeline: [], tokens: 3, score: 0 },
@@ -93,7 +93,7 @@ describe('gameStore', () => {
       joinCode: 'ABCD',
       status: 'lobby',
       mode: 'classic',
-      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15 },
+      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15, revealTimeSeconds: 5 },
       teams: {
         A: { name: 'Team A', players: [player], timeline: [], tokens: 3, score: 0 },
         B: { name: 'Team B', players: [], timeline: [], tokens: 3, score: 0 },
@@ -118,7 +118,7 @@ describe('gameStore', () => {
       joinCode: 'ABCD',
       status: 'lobby',
       mode: 'classic',
-      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15 },
+      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15, revealTimeSeconds: 5 },
       teams: {
         A: { name: 'Team A', players: [], timeline: [], tokens: 3, score: 0 },
         B: { name: 'Team B', players: [], timeline: [], tokens: 3, score: 0 },
@@ -142,7 +142,7 @@ describe('gameStore', () => {
       joinCode: 'ABCD',
       status: 'lobby',
       mode: 'classic',
-      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15 },
+      settings: { targetScore: 10, quizTimeSeconds: 45, placementTimeSeconds: 20, vetoWindowSeconds: 10, vetoPlacementSeconds: 15, revealTimeSeconds: 5 },
       teams: {
         A: { name: 'Team A', players: [], timeline: [], tokens: 3, score: 0 },
         B: { name: 'Team B', players: [], timeline: [], tokens: 3, score: 0 },

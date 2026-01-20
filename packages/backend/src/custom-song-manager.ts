@@ -23,7 +23,8 @@ export class CustomSongManager {
       artist: input.artist.trim(),
       year: input.year,
       spotifyUri: `spotify:track:${spotifyId}`,
-      spotifyUrl: `https://open.spotify.com/track/${spotifyId}`
+      spotifyUrl: `https://open.spotify.com/track/${spotifyId}`,
+      deeplink: `https://open.spotify.com/track/${spotifyId}`,
     };
 
     this.songs.push(song);
