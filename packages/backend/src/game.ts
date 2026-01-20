@@ -133,6 +133,25 @@ export class Game extends DurableObject {
       this.wsToPlayer.set(ws, sessionId);
       this.connections.set(ws, { playerId: existingPlayer.id });
       await this.persistState();
+
+      // Send rejoin confirmation and state sync
+      this.sendToWs(ws, {
+        type: 'rejoin_success',
+        payload: { playerId: existingPlayer.id, playerName: existingPlayer.name },
+      });
+      this.sendStateSync(ws, existingPlayer);
+
+      // Broadcast player_reconnected to all other players
+      this.broadcast({
+        type: 'player_reconnected',
+        payload: {
+          playerId: existingPlayer.id,
+          sessionId: existingPlayer.sessionId,
+          playerName: existingPlayer.name,
+          team: existingPlayer.team,
+        },
+      }, ws);
+
       return;
     }
 
@@ -253,6 +272,17 @@ export class Game extends DurableObject {
 
     // Send full state sync
     this.sendStateSync(ws, player);
+
+    // Broadcast player_reconnected to all other players
+    this.broadcast({
+      type: 'player_reconnected',
+      payload: {
+        playerId: player.id,
+        sessionId: player.sessionId,
+        playerName: player.name,
+        team: player.team,
+      },
+    }, ws);
 
     return { success: true, playerName: player.name };
   }
@@ -1591,6 +1621,8 @@ export class Game extends DurableObject {
 
       switch (type) {
         case "join":
+        case "rejoin":
+          // Both join and rejoin use the same handler - it detects reconnection via sessionId
           await this.handleJoin(payload, ws);
           break;
 

@@ -5,12 +5,11 @@ import { LobbyView } from './components/LobbyView';
 import { PlayingView } from './components/PlayingView';
 import { ConnectionStatus } from './components/ConnectionStatus';
 import { PlayerStatusRow } from './components/PlayerStatusRow';
+import { useReconnectingWebSocket } from './hooks/useReconnectingWebSocket';
 import type { GameState, Player, PlayerReadyMessage } from '@party-popper/shared';
 import { ConnectionState } from '@party-popper/shared';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
-
-type Screen = 'join' | 'lobby' | 'playing';
+type Screen = 'join' | 'lobby' | 'playing' | 'reconnecting';
 
 interface PlayerState {
   playerId: string;
@@ -20,206 +19,251 @@ interface PlayerState {
 
 function App() {
   const [screen, setScreen] = useState<Screen>('join');
-  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [playerState, setPlayerState] = useState<PlayerState | null>(null);
   const [scanDetected, setScanDetected] = useState(false);
+  const [reconnectMessage, setReconnectMessage] = useState<string | null>(null);
   const autoReadyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const sessionIdRef = useRef<string>(
-    sessionStorage.getItem('playerSessionId') || crypto.randomUUID()
-  );
+  // Handle incoming WebSocket messages
+  const handleMessage = useCallback((message: { type: string; payload?: unknown }) => {
+    switch (message.type) {
+      case 'state_sync': {
+        const payload = message.payload as { gameState: GameState };
+        const state = payload.gameState;
+        setGameState(state);
 
-  // Persist session ID
-  useEffect(() => {
-    sessionStorage.setItem('playerSessionId', sessionIdRef.current);
-  }, []);
+        // Find our player
+        const allPlayers = [...state.teams.A.players, ...state.teams.B.players];
+        const ourPlayer = allPlayers.find(p => p.sessionId === sessionId);
 
-  const handleJoin = useCallback(async ({ code, name }: { code: string; name: string }) => {
-    setIsLoading(true);
-    setError(null);
+        if (ourPlayer) {
+          setPlayerState(prev => ({
+            playerId: ourPlayer.id,
+            sessionId: sessionId,
+            gameCode: prev?.gameCode || storedSession?.gameCode || '',
+          }));
 
-    try {
-      // Connect to WebSocket
-      const wsProtocol = API_URL.startsWith('https') ? 'wss' : 'ws';
-      const wsHost = API_URL.replace(/^https?:\/\//, '');
-      const ws = new WebSocket(`${wsProtocol}://${wsHost}/api/games/${code}/ws`);
-
-      wsRef.current = ws;
-      setConnectionState(ConnectionState.Connecting);
-
-      ws.onopen = () => {
-        setConnectionState(ConnectionState.Connected);
-        // Send join message
-        ws.send(JSON.stringify({
-          type: 'join',
-          payload: {
-            playerName: name,
-            sessionId: sessionIdRef.current,
-          },
-        }));
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-
-          switch (message.type) {
-            case 'state_sync': {
-              const state = message.payload.gameState as GameState;
-              setGameState(state);
-
-              // Find our player
-              const allPlayers = [...state.teams.A.players, ...state.teams.B.players];
-              const ourPlayer = allPlayers.find(p => p.sessionId === sessionIdRef.current);
-
-              if (ourPlayer) {
-                setPlayerState({
-                  playerId: ourPlayer.id,
-                  sessionId: sessionIdRef.current,
-                  gameCode: code,
-                });
-
-                // Set screen based on game status
-                switch (state.status) {
-                  case 'lobby':
-                    setScreen('lobby');
-                    break;
-                  case 'playing':
-                    setScreen('playing');
-                    break;
-                  case 'finished':
-                    setScreen('playing'); // Show playing screen with results
-                    break;
-                }
-
-                setIsLoading(false);
-              }
+          // Set screen based on game status
+          switch (state.status) {
+            case 'lobby':
+              setScreen('lobby');
               break;
-            }
-            case 'player_joined': {
-              const player = message.payload.player as Player;
-              setGameState(prev => {
-                if (!prev) return prev;
-                const team = player.team;
-                return {
-                  ...prev,
-                  teams: {
-                    ...prev.teams,
-                    [team]: {
-                      ...prev.teams[team],
-                      players: [...prev.teams[team].players, player],
-                    },
-                  },
-                };
-              });
-              break;
-            }
-            case 'player_left': {
-              const { playerId } = message.payload;
-              setGameState(prev => {
-                if (!prev) return prev;
-                return {
-                  ...prev,
-                  teams: {
-                    A: {
-                      ...prev.teams.A,
-                      players: prev.teams.A.players.filter(p => p.id !== playerId),
-                    },
-                    B: {
-                      ...prev.teams.B,
-                      players: prev.teams.B.players.filter(p => p.id !== playerId),
-                    },
-                  },
-                };
-              });
-              break;
-            }
-            case 'game_started': {
+            case 'playing':
               setScreen('playing');
               break;
-            }
-            case 'leader_claimed': {
-              const { team, playerId } = message.payload as { team: 'A' | 'B'; playerId: string };
-              setGameState(prev => {
-                if (!prev) return prev;
-                return {
-                  ...prev,
-                  teams: {
-                    ...prev.teams,
-                    [team]: {
-                      ...prev.teams[team],
-                      players: prev.teams[team].players.map((p: Player) =>
-                        p.id === playerId ? { ...p, isTeamLeader: true } : p
-                      ),
-                    },
-                  },
-                };
-              });
+            case 'finished':
+              setScreen('playing'); // Show playing screen with results
               break;
-            }
-            case 'qr_scan_detected': {
-              setScanDetected(true);
-              // Auto-ready after 2 seconds - timer has started!
-              autoReadyTimeoutRef.current = setTimeout(() => {
-                handleReady();
-              }, 2000);
-              break;
-            }
-            case 'phase_changed': {
-              const { phase, endsAt, quizOptions } = message.payload;
-              setGameState(prev => {
-                if (!prev || !prev.currentRound) return prev;
-                return {
-                  ...prev,
-                  currentRound: {
-                    ...prev.currentRound,
-                    phase,
-                    endsAt,
-                    // Include quizOptions if provided (sent when transitioning to quiz phase)
-                    ...(quizOptions && { quizOptions }),
-                  },
-                };
-              });
-              break;
-            }
-            case 'error': {
-              setError(message.payload.message);
-              setIsLoading(false);
-              break;
-            }
           }
-        } catch (err) {
-          console.error('Failed to parse message:', err);
-        }
-      };
 
-      ws.onclose = () => {
-        setConnectionState(ConnectionState.Disconnected);
-        if (screen === 'join') {
-          setError('Connection lost. Please try again.');
           setIsLoading(false);
+          setReconnectMessage(null);
         }
-      };
-
-      ws.onerror = () => {
-        setError('Failed to connect. Check the game code and try again.');
+        break;
+      }
+      case 'rejoin_success': {
+        // Server confirmed our rejoin - state_sync will follow
+        setReconnectMessage('Reconnected! Syncing state...');
+        break;
+      }
+      case 'player_joined': {
+        const payload = message.payload as { player: Player };
+        const player = payload.player;
+        setGameState(prev => {
+          if (!prev) return prev;
+          const team = player.team;
+          return {
+            ...prev,
+            teams: {
+              ...prev.teams,
+              [team]: {
+                ...prev.teams[team],
+                players: [...prev.teams[team].players, player],
+              },
+            },
+          };
+        });
+        break;
+      }
+      case 'player_left': {
+        const payload = message.payload as { playerId: string };
+        const { playerId } = payload;
+        setGameState(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            teams: {
+              A: {
+                ...prev.teams.A,
+                players: prev.teams.A.players.filter(p => p.id !== playerId),
+              },
+              B: {
+                ...prev.teams.B,
+                players: prev.teams.B.players.filter(p => p.id !== playerId),
+              },
+            },
+          };
+        });
+        break;
+      }
+      case 'player_reconnected': {
+        const payload = message.payload as { playerId: string; sessionId: string };
+        // Update player's connected status
+        setGameState(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            teams: {
+              A: {
+                ...prev.teams.A,
+                players: prev.teams.A.players.map(p =>
+                  p.id === payload.playerId ? { ...p, connected: true } : p
+                ),
+              },
+              B: {
+                ...prev.teams.B,
+                players: prev.teams.B.players.map(p =>
+                  p.id === payload.playerId ? { ...p, connected: true } : p
+                ),
+              },
+            },
+          };
+        });
+        break;
+      }
+      case 'game_started': {
+        setScreen('playing');
+        break;
+      }
+      case 'leader_claimed': {
+        const payload = message.payload as { team: 'A' | 'B'; playerId: string };
+        const { team, playerId } = payload;
+        setGameState(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            teams: {
+              ...prev.teams,
+              [team]: {
+                ...prev.teams[team],
+                players: prev.teams[team].players.map((p: Player) =>
+                  p.id === playerId ? { ...p, isTeamLeader: true } : p
+                ),
+              },
+            },
+          };
+        });
+        break;
+      }
+      case 'qr_scan_detected': {
+        setScanDetected(true);
+        // Auto-ready after 2 seconds - timer has started!
+        autoReadyTimeoutRef.current = setTimeout(() => {
+          handleReady();
+        }, 2000);
+        break;
+      }
+      case 'phase_changed': {
+        const payload = message.payload as { phase: string; endsAt: number; quizOptions?: GameState['currentRound'] extends { quizOptions?: infer Q } ? Q : never };
+        const { phase, endsAt, quizOptions } = payload;
+        setGameState(prev => {
+          if (!prev || !prev.currentRound) return prev;
+          const updatedRound = {
+            ...prev.currentRound,
+            phase: phase as NonNullable<GameState['currentRound']>['phase'],
+            endsAt,
+          };
+          // Include quizOptions if provided (sent when transitioning to quiz phase)
+          if (quizOptions) {
+            updatedRound.quizOptions = quizOptions;
+          }
+          return {
+            ...prev,
+            currentRound: updatedRound,
+          };
+        });
+        break;
+      }
+      case 'error': {
+        const payload = message.payload as { message: string };
+        setError(payload.message);
         setIsLoading(false);
-        setConnectionState(ConnectionState.Disconnected);
-      };
+        break;
+      }
+    }
+  }, []);
 
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join game');
+  // WebSocket connection callbacks
+  const handleConnected = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const handleDisconnected = useCallback(() => {
+    // Only show error on join screen
+    if (screen === 'join') {
+      setError('Connection lost. Please try again.');
       setIsLoading(false);
     }
   }, [screen]);
 
+  const handleReconnecting = useCallback(() => {
+    setReconnectMessage('Connection lost. Reconnecting...');
+  }, []);
+
+  const handleReconnectFailed = useCallback(() => {
+    setReconnectMessage(null);
+    setError('Failed to reconnect. Please rejoin the game.');
+    setScreen('join');
+    clearStoredSession();
+  }, []);
+
+  // Initialize the reconnecting WebSocket hook
+  const {
+    connect,
+    disconnect,
+    send,
+    connectionState,
+    sessionId,
+    isReconnecting,
+    storedSession,
+    clearStoredSession,
+  } = useReconnectingWebSocket({
+    onMessage: handleMessage,
+    onConnected: handleConnected,
+    onDisconnected: handleDisconnected,
+    onReconnecting: handleReconnecting,
+    onReconnectFailed: handleReconnectFailed,
+  });
+
+  // Handle join form submission
+  const handleJoin = useCallback(({ code, name }: { code: string; name: string }) => {
+    setIsLoading(true);
+    setError(null);
+    connect(code, name);
+  }, [connect]);
+
+  // Handle rejoining from stored session
+  const handleRejoin = useCallback(() => {
+    if (storedSession) {
+      setIsLoading(true);
+      setError(null);
+      setReconnectMessage('Rejoining game...');
+      connect(storedSession.gameCode, storedSession.playerName);
+    }
+  }, [storedSession, connect]);
+
+  // Clear stored session and start fresh
+  const handleStartFresh = useCallback(() => {
+    clearStoredSession();
+    setError(null);
+  }, [clearStoredSession]);
+
   // Handler for ready button
   const handleReady = useCallback(() => {
-    if (!wsRef.current || !playerState) return;
+    if (!playerState) return;
 
     // Clear auto-ready timeout if it exists
     if (autoReadyTimeoutRef.current) {
@@ -234,86 +278,85 @@ function App() {
       },
     };
 
-    wsRef.current.send(JSON.stringify(message));
+    send(message);
     setScanDetected(false); // Reset scan detection state
-  }, [playerState]);
+  }, [playerState, send]);
 
   // Handler for quiz submission
   const handleSubmitQuiz = useCallback((artistIndex: number, titleIndex: number) => {
-    wsRef.current?.send(JSON.stringify({
+    send({
       type: 'submit_quiz',
-      payload: { artistIndex, titleIndex, sessionId: sessionIdRef.current }
-    }));
-  }, []);
+      payload: { artistIndex, titleIndex, sessionId }
+    });
+  }, [send, sessionId]);
 
   // Handler for placement submission
   const handleSubmitPlacement = useCallback((position: number) => {
-    wsRef.current?.send(JSON.stringify({
+    send({
       type: 'submit_placement',
-      payload: { position, sessionId: sessionIdRef.current }
-    }));
-  }, []);
+      payload: { position, sessionId }
+    });
+  }, [send, sessionId]);
 
   // Handler for using veto
   const handleUseVeto = useCallback(() => {
-    wsRef.current?.send(JSON.stringify({
+    send({
       type: 'use_veto',
-      payload: { sessionId: sessionIdRef.current }
-    }));
-  }, []);
+      payload: { sessionId }
+    });
+  }, [send, sessionId]);
 
   // Handler for passing on veto
   const handlePassVeto = useCallback(() => {
-    wsRef.current?.send(JSON.stringify({
+    send({
       type: 'pass_veto',
-      payload: { sessionId: sessionIdRef.current }
-    }));
-  }, []);
+      payload: { sessionId }
+    });
+  }, [send, sessionId]);
 
   // Handler for veto placement submission
   const handleSubmitVetoPlacement = useCallback((position: number) => {
-    wsRef.current?.send(JSON.stringify({
+    send({
       type: 'submit_veto_placement',
-      payload: { position, sessionId: sessionIdRef.current }
-    }));
-  }, []);
+      payload: { position, sessionId }
+    });
+  }, [send, sessionId]);
 
   // Handler for claiming team leader
   const handleClaimLeader = useCallback(() => {
-    wsRef.current?.send(JSON.stringify({
+    send({
       type: 'claim_team_leader',
-      payload: { sessionId: sessionIdRef.current }
-    }));
-  }, []);
+      payload: { sessionId }
+    });
+  }, [send, sessionId]);
 
   // Handler for quiz suggestion (non-leaders)
   const handleQuizSuggestion = useCallback((artistIndex: number | null, titleIndex: number | null) => {
-    wsRef.current?.send(JSON.stringify({
+    send({
       type: 'submit_quiz_suggestion',
-      payload: { artistIndex, titleIndex, sessionId: sessionIdRef.current }
-    }));
-  }, []);
+      payload: { artistIndex, titleIndex, sessionId }
+    });
+  }, [send, sessionId]);
 
   // Handler for placement suggestion (non-leaders)
   const handlePlacementSuggestion = useCallback((position: number) => {
-    wsRef.current?.send(JSON.stringify({
+    send({
       type: 'submit_placement_suggestion',
-      payload: { position, sessionId: sessionIdRef.current }
-    }));
-  }, []);
+      payload: { position, sessionId }
+    });
+  }, [send, sessionId]);
 
   // Handler for veto suggestion (non-leaders)
   const handleVetoSuggestion = useCallback((useVeto: boolean) => {
-    wsRef.current?.send(JSON.stringify({
+    send({
       type: 'submit_veto_suggestion',
-      payload: { useVeto, sessionId: sessionIdRef.current }
-    }));
-  }, []);
+      payload: { useVeto, sessionId }
+    });
+  }, [send, sessionId]);
 
-  // Cleanup WebSocket and timeout on unmount
+  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      wsRef.current?.close(1000);
       if (autoReadyTimeoutRef.current) {
         clearTimeout(autoReadyTimeoutRef.current);
       }
@@ -338,14 +381,50 @@ function App() {
           isTeamLeader={currentPlayer.isTeamLeader}
         />
       )}
-      <ConnectionStatus state={connectionState} />
+      <ConnectionStatus
+        state={isReconnecting ? ConnectionState.Connecting : connectionState}
+      />
+
+      {/* Reconnecting overlay */}
+      {reconnectMessage && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl p-6 text-center max-w-sm mx-4">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-white text-lg">{reconnectMessage}</p>
+          </div>
+        </div>
+      )}
 
       {screen === 'join' && (
-        <JoinScreen
-          onJoin={handleJoin}
-          isLoading={isLoading}
-          error={error}
-        />
+        <>
+          {/* Show rejoin option if there's a stored session */}
+          {storedSession && !isLoading && (
+            <div className="mb-6 p-4 bg-blue-900/30 border border-blue-500 rounded-xl">
+              <p className="text-blue-300 text-sm mb-3">
+                You were in game <strong>{storedSession.gameCode}</strong> as <strong>{storedSession.playerName}</strong>
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRejoin}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  Rejoin Game
+                </button>
+                <button
+                  onClick={handleStartFresh}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  New Game
+                </button>
+              </div>
+            </div>
+          )}
+          <JoinScreen
+            onJoin={handleJoin}
+            isLoading={isLoading}
+            error={error}
+          />
+        </>
       )}
 
       {screen === 'lobby' && gameState && playerState && (
