@@ -17,6 +17,12 @@ binding = "GAME_CODES"
 id = "8e7d31bc22864b7e83bf581deb8d0c41"
 preview_id = "0e78b4aa528b4dffa039b7e4f61a1b08"
 
+# KV namespace for QR code debugging logs
+[[kv_namespaces]]
+binding = "QR_LOGS"
+id = "qr-logs-placeholder"
+preview_id = "qr-logs-preview-placeholder"
+
 [dev]
 port = 8787
 local_protocol = "http"
@@ -28,4 +34,4 @@ ENVIRONMENT = "development"
 
 # CORS origins for local development
 # In production, these would be the actual Cloudflare Pages URLs
-ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,https://undefined-liable-hdtv-subjective.trycloudflare.com"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:3001,https://shirts-son-rather-wanted.trycloudflare.com"

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Round, NewRoundPhase } from '@party-popper/shared';
 import { SongQRCode } from './SongQRCode';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
 interface RoundDisplayProps {
   round: Round;
@@ -11,6 +13,37 @@ interface RoundDisplayProps {
 
 export function RoundDisplay({ round, teamName = 'Current Team', vetoTeamName, gameCode }: RoundDisplayProps) {
   const [remainingTime, setRemainingTime] = useState<number>(0);
+  const [logStatus, setLogStatus] = useState<'idle' | 'logging' | 'success' | 'error'>('idle');
+
+  // Build the QR code URL for logging
+  const QR_BASE_URL = import.meta.env.VITE_QR_BASE_URL || API_URL;
+  const PLAYLIST_ID = '7KZdOsKtIGfE9YKiJjyM8I';
+  const trackId = round.song.spotifyUri.startsWith('spotify:track:')
+    ? round.song.spotifyUri.replace('spotify:track:', '')
+    : round.song.spotifyUri;
+  const spotifyUrl = `https://open.spotify.com/track/${trackId}?context=spotify:playlist:${PLAYLIST_ID}`;
+  const qrCodeUrl = `${QR_BASE_URL}/qr/track?code=${gameCode}&spotify=${encodeURIComponent(spotifyUrl)}`;
+
+  const logQrUrl = useCallback(async (type: 'success' | 'failed') => {
+    setLogStatus('logging');
+    try {
+      await fetch(`${API_URL}/api/qr-log/${type}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: qrCodeUrl,
+          songTitle: `${round.song.artist} - ${round.song.title}`,
+          gameCode,
+        }),
+      });
+      setLogStatus('success');
+      setTimeout(() => setLogStatus('idle'), 2000);
+    } catch (error) {
+      console.error('Failed to log QR URL:', error);
+      setLogStatus('error');
+      setTimeout(() => setLogStatus('idle'), 2000);
+    }
+  }, [qrCodeUrl, round.song.artist, round.song.title, gameCode]);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -48,6 +81,26 @@ export function RoundDisplay({ round, teamName = 'Current Team', vetoTeamName, g
               {teamName}'s Turn
             </div>
             <SongQRCode spotifyUri={round.song.spotifyUri} gameCode={gameCode} size={250} />
+            {/* QR Debug Buttons */}
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => logQrUrl('success')}
+                disabled={logStatus === 'logging'}
+                className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white rounded transition-colors"
+              >
+                {logStatus === 'logging' ? '...' : logStatus === 'success' ? '✓' : 'Works'}
+              </button>
+              <button
+                onClick={() => logQrUrl('failed')}
+                disabled={logStatus === 'logging'}
+                className="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 disabled:bg-gray-500 text-white rounded transition-colors"
+              >
+                {logStatus === 'logging' ? '...' : logStatus === 'success' ? '✓' : "Doesn't Work"}
+              </button>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              {round.song.artist} - {round.song.title}
+            </div>
             <div
               data-testid="round-timer"
               className="text-6xl font-mono font-bold text-white"
