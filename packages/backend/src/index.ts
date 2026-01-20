@@ -48,6 +48,11 @@ export default {
       return handleRequest(request, env);
     }
 
+    // QR log routes - delegate to router
+    if (path.startsWith('/api/qr-log')) {
+      return handleRequest(request, env);
+    }
+
     // Game routes - delegate to router
     if (path.startsWith('/api/games')) {
       return handleRequest(request, env);
